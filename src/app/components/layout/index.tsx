@@ -1,25 +1,25 @@
 "use client";
 
 import {
-  ActionIcon,
-  AppShell,
-  Avatar,
-  Box,
-  Group,
-  Indicator,
-  Menu,
-  ScrollArea,
-  Text,
-  UnstyledButton,
+    ActionIcon,
+    AppShell,
+    Avatar,
+    Box,
+    Group,
+    Indicator,
+    Menu,
+    ScrollArea,
+    Text,
+    UnstyledButton,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import {
-  IconBell,
-  IconChevronDown,
-  IconLogout,
-  IconMenu2 as IconMenu,
-  IconSettings,
-  IconUser,
+    IconBell,
+    IconChevronDown,
+    IconLogout,
+    IconMenu2 as IconMenu,
+    IconSettings,
+    IconUser,
 } from "@tabler/icons-react";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -28,9 +28,9 @@ import { useDispatch, useSelector } from "react-redux";
 import { useGetCurrentUserQuery } from "../../../shared/api/authApi";
 import AuthGuard from "../../../shared/components/AuthGuard";
 import {
-  logout,
-  selectCurrentUser,
-  setUser,
+    logout,
+    selectCurrentUser,
+    setUser,
 } from "../../../shared/slices/authSlice";
 import ClientNavWrapper from "../clientNavWrapper/clientNavWrapper";
 import menuItems from "../dashboard/menu_items";
@@ -88,7 +88,9 @@ const ProtectedLayout = ({
   const dispatch = useDispatch();
   const router = useRouter();
 
-  const { data: userData } = useGetCurrentUserQuery();
+  const { data: userData } = useGetCurrentUserQuery(undefined, {
+    skip: !!userFromRedux,
+  });
 
   // Update user in Redux when fetched from API
   useEffect(() => {

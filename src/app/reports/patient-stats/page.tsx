@@ -1,7 +1,7 @@
 "use client";
 
 import { Badge, Box, Button, Card, Group, Progress, Select, Stack, Table, Text, Title } from "@mantine/core";
-import { Calendar, Download, TrendingUp, Users, UserPlus } from "lucide-react";
+import { Download, TrendingUp, UserPlus, Users } from "lucide-react";
 import { useState } from "react";
 
 const ageGroups = [
@@ -35,7 +35,7 @@ const topTreatments = [
 ];
 
 export default function PatientStatsPage() {
-  const [selectedPeriod, setSelectedPeriod] = useState("december");
+  const [selectedPeriod, setSelectedPeriod] = useState<string | null>("december");
   const totalPatients = 1248;
   const newThisMonth = 48;
   const retentionRate = 87;
@@ -111,7 +111,7 @@ export default function PatientStatsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <Card shadow="sm" p="lg" className="border border-gray-200">
           <Title order={4} mb="md">Monthly Patient Trends (2024)</Title>
-          <Table highlightOnHover verticalSpacing="sm" fontSize="sm">
+          <Table highlightOnHover verticalSpacing="sm">
             <Table.Thead><Table.Tr><Table.Th>Month</Table.Th><Table.Th>New</Table.Th><Table.Th>Returning</Table.Th><Table.Th>Total</Table.Th></Table.Tr></Table.Thead>
             <Table.Tbody>
               {monthlyPatients.slice(-6).map((month) => (
@@ -128,7 +128,7 @@ export default function PatientStatsPage() {
 
         <Card shadow="sm" p="lg" className="border border-gray-200">
           <Title order={4} mb="md">Top Treatments</Title>
-          <Table highlightOnHover verticalSpacing="sm" fontSize="sm">
+          <Table highlightOnHover verticalSpacing="sm">
             <Table.Thead><Table.Tr><Table.Th>Treatment</Table.Th><Table.Th>Visits</Table.Th><Table.Th>Patients</Table.Th></Table.Tr></Table.Thead>
             <Table.Tbody>
               {topTreatments.map((treatment) => (

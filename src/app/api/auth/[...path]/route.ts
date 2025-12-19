@@ -18,10 +18,12 @@ export async function POST(
       body: JSON.stringify(body),
     });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      return NextResponse.json(data, { status: response.status });
+    const contentType = response.headers.get("content-type");
+    let data;
+    if (contentType && contentType.includes("application/json")) {
+      data = await response.json();
+    } else {
+      data = { message: await response.text() };
     }
 
     return NextResponse.json(data, { status: response.status });
@@ -47,12 +49,10 @@ export async function GET(
     };
 
     if (authHeader) {
-      // Convert "Bearer token" to "JWT token" format expected by backend
       const token = authHeader.replace("Bearer ", "");
       headers["Authorization"] = `JWT ${token}`;
     }
 
-    // Remove trailing slash for 'me' endpoint
     const endpoint = path === "me"
       ? `${API_BASE_URL}/auth/${path}`
       : `${API_BASE_URL}/auth/${path}/`;
@@ -62,10 +62,12 @@ export async function GET(
       headers,
     });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      return NextResponse.json(data, { status: response.status });
+    const contentType = response.headers.get("content-type");
+    let data;
+    if (contentType && contentType.includes("application/json")) {
+      data = await response.json();
+    } else {
+      data = { message: await response.text() };
     }
 
     return NextResponse.json(data, { status: response.status });

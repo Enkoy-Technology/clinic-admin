@@ -1,15 +1,14 @@
 "use client";
 
 import {
-  Box,
-  Button,
-  Checkbox,
-  Divider,
-  PasswordInput,
-  Stack,
-  Text,
-  TextInput,
-  Title,
+    Box,
+    Button,
+    Checkbox,
+    Divider,
+    PasswordInput,
+    Text,
+    TextInput,
+    Title
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
@@ -34,6 +33,11 @@ export default function LoginPage() {
       router.push("/");
     }
   }, [isAuthenticated, router]);
+
+  // Ping backend to wake it up from cold start
+  useEffect(() => {
+    fetch("/api/auth/me").catch(() => {});
+  }, []);
 
   const form = useForm({
     initialValues: {

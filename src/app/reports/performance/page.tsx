@@ -1,6 +1,6 @@
 "use client";
 
-import { Avatar, Badge, Box, Button, Card, Group, Progress, Select, Stack, Table, Text, Title } from "@mantine/core";
+import { Avatar, Badge, Box, Button, Card, Group, Select, Table, Text, Title } from "@mantine/core";
 import { Award, Calendar, Download, Star, TrendingUp, Users } from "lucide-react";
 import { useState } from "react";
 
@@ -28,7 +28,7 @@ const monthlyMetrics = [
 ];
 
 export default function PerformanceReportsPage() {
-  const [selectedPeriod, setSelectedPeriod] = useState("december");
+  const [selectedPeriod, setSelectedPeriod] = useState<string | null>("december");
   const completionRate = 96.5;
   const avgSatisfaction = 4.8;
 
@@ -80,7 +80,7 @@ export default function PerformanceReportsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <Card shadow="sm" p="lg" className="border border-gray-200">
           <Title order={4} mb="md">Service Performance</Title>
-          <Table highlightOnHover verticalSpacing="sm" fontSize="sm">
+          <Table highlightOnHover verticalSpacing="sm">
             <Table.Thead><Table.Tr><Table.Th>Service</Table.Th><Table.Th>Completed</Table.Th><Table.Th>Avg. Time</Table.Th><Table.Th>Rating</Table.Th></Table.Tr></Table.Thead>
             <Table.Tbody>
               {servicePerformance.map((service) => (
@@ -97,7 +97,7 @@ export default function PerformanceReportsPage() {
 
         <Card shadow="sm" p="lg" className="border border-gray-200">
           <Title order={4} mb="md">Monthly Trends (Last 6 Months)</Title>
-          <Table highlightOnHover verticalSpacing="sm" fontSize="sm">
+          <Table highlightOnHover verticalSpacing="sm">
             <Table.Thead><Table.Tr><Table.Th>Month</Table.Th><Table.Th>Total</Table.Th><Table.Th>Completed</Table.Th><Table.Th>Rate</Table.Th></Table.Tr></Table.Thead>
             <Table.Tbody>
               {monthlyMetrics.map((month) => {

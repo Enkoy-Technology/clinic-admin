@@ -16,19 +16,13 @@ export default function AuthGuard({ children }: AuthGuardProps) {
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
-    // Small delay to allow Redux to initialize from localStorage
-    const timer = setTimeout(() => {
-      setIsChecking(false);
-
-      if (!isAuthenticated) {
-        router.push("/login");
-      }
-    }, 100);
-
-    return () => clearTimeout(timer);
+    if (!isAuthenticated) {
+      router.push("/login");
+    }
+    setIsChecking(false);
   }, [isAuthenticated, router]);
 
-  // Show loader while checking auth
+  // Handle dehydration/hydration flash
   if (isChecking) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
@@ -37,14 +31,11 @@ export default function AuthGuard({ children }: AuthGuardProps) {
     );
   }
 
-  // If not authenticated, show loader while redirecting
   if (!isAuthenticated) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <Loader size="lg" color="teal" />
-      </div>
-    );
+    return null; // Let the router.push handle it
   }
+
+  return <>{children}</>;
 
   return <>{children}</>;
 }

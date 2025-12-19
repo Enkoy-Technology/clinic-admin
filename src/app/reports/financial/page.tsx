@@ -1,7 +1,7 @@
 "use client";
 
 import { Badge, Box, Button, Card, Group, Progress, Select, Stack, Table, Text, Title } from "@mantine/core";
-import { Calendar, Download, DollarSign, TrendingDown, TrendingUp } from "lucide-react";
+import { DollarSign, Download, TrendingDown, TrendingUp } from "lucide-react";
 import { useState } from "react";
 
 const monthlyData = [
@@ -37,10 +37,10 @@ const revenueByService = [
 ];
 
 export default function FinancialReportsPage() {
-  const [selectedPeriod, setSelectedPeriod] = useState("december");
+  const [selectedPeriod, setSelectedPeriod] = useState<string | null>("december");
 
-  const currentMonth = monthlyData[11];
-  const previousMonth = monthlyData[10];
+  const currentMonth = monthlyData[11]!;
+  const previousMonth = monthlyData[10]!;
   const revenueChange = ((currentMonth.revenue - previousMonth.revenue) / previousMonth.revenue * 100).toFixed(1);
   const profitChange = ((currentMonth.profit - previousMonth.profit) / previousMonth.profit * 100).toFixed(1);
   const yearlyRevenue = monthlyData.reduce((sum, m) => sum + m.revenue, 0);
@@ -75,7 +75,7 @@ export default function FinancialReportsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <Card shadow="sm" p="lg" className="border border-gray-200">
           <Title order={4} mb="md">Monthly Performance (2024)</Title>
-          <Table highlightOnHover verticalSpacing="sm" fontSize="sm">
+          <Table highlightOnHover verticalSpacing="sm">
             <Table.Thead><Table.Tr><Table.Th>Month</Table.Th><Table.Th>Revenue</Table.Th><Table.Th>Expenses</Table.Th><Table.Th>Profit</Table.Th><Table.Th>Margin</Table.Th></Table.Tr></Table.Thead>
             <Table.Tbody>
               {monthlyData.slice(-6).map((month) => (

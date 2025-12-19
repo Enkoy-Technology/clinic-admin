@@ -2,16 +2,15 @@
 
 import { Collapse, Group, Text, UnstyledButton } from "@mantine/core";
 import {
-  IconChevronDown,
-  IconChevronRight,
-  TablerIcon,
+    IconChevronDown,
+    IconChevronRight
 } from "@tabler/icons-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 interface MainLinkProps {
-  icon: TablerIcon;
+  icon: any;
   label: string;
   link?: string;
   subItems?: { link: string; label: string }[];
@@ -127,7 +126,7 @@ const MainLink = ({
 };
 
 interface MenuItem {
-  icon: TablerIcon;
+  icon: any;
   label: string;
   link?: string;
   subItems?: { link: string; label: string }[];
