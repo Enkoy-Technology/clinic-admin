@@ -1,0 +1,230 @@
+/* Import Tailwind and Mantine styles first */
+@import "@mantine/core/styles.css";
+@import "@mantine/notifications/styles.css";
+@import "@mantine/dates/styles.css";
+@import "@mantine/carousel/styles.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+/* Font-face declarations */
+@font-face {
+  font-family: "Gilroy-Bold";
+  src:
+    local("Gilroy-Bold"),
+    url(/fonts/Gilroy-Bold.ttf) format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  size-adjust: true;
+}
+
+@font-face {
+  font-family: "Gilroy-Medium";
+  src:
+    local("Gilroy-Medium"),
+    url(/fonts/Gilroy-Medium.ttf) format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  size-adjust: true;
+}
+
+@font-face {
+  font-family: "Gilroy-Light";
+  src:
+    local("Gilroy-Light"),
+    url(/fonts/Gilroy-Light.ttf) format("truetype");
+  font-weight: 300;
+  font-style: normal;
+  size-adjust: true;
+}
+
+/* Light mode variables */
+:root[data-mantine-color-scheme="light"] {
+  --mantine-font-family: "Gilroy-Medium";
+  --mantine-color-body: #fff;
+  --mantine-text-color: #000000;
+  --tabs-color: var(--mantine-color-primary-7);
+  --border-color: var(--border-color-light);
+  --card: #fff;
+  --font-family: var(--mantine-font-family);
+  --font-size: var(--mantine-font-size-md);
+  --line-height: var(--mantine-line-height);
+  --background-color: var(--mantine-color-body);
+  --color: var(--mantine-color-text);
+  --rating-color: var(--mantine-color-primary-7);
+  -webkit-font-smoothing: var(--mantine-webkit-font-smoothing);
+  -moz-osx-font-smoothing: var(--mantine-moz-font-smoothing);
+  --header-background-light: var(--mantine-color-white);
+  --header-background-dark: var(--mantine-color-dark-9);
+  --header-text-light: var(--mantine-color-black);
+  --header-text-dark: var(--mantine-color-white);
+  --header-hover-background-light: var(--mantine-color-gray-0);
+  --header-hover-background-dark: var(--mantine-color-dark-6);
+  --border-color-light: var(--mantine-color-gray-3);
+  --border-color-dark: var(--mantine-color-dark-4);
+  --carousel-control-size: 26px;
+  --carousel-controls-offset: var(--mantine-spacing-sm);
+  --carousel-height: auto;
+  --mantine-Carousel-control: var(--mantine-primary-color-7);
+  --checkbox-icon-color: var(--mantine-color-primary-7);
+  --primary-gradient: linear-gradient(
+    45deg,
+    var(--mantine-color-primary-0),
+    var(--mantine-color-gray-5)
+  );
+  --secondary-gradient: linear-gradient(
+    45deg,
+    var(--mantine-color-primary-1),
+    var(--mantine-color-secondary-5)
+  );
+}
+
+/* Dark mode variables */
+:root[data-mantine-color-scheme="dark"] {
+  --mantine-color-body: var(--mantine-color-dark-7);
+  --border-color: var(--mantine-color-gray-4);
+  --checkbox-icon-color: var(--mantine-color-dark-7);
+  --card: #000;
+  --mantine-text-color: #fff;
+  --font-family: var(--mantine-font-family);
+  --font-size: var(--mantine-font-size-md);
+  --line-height: var(--mantine-line-height);
+  --background-color: var(--mantine-color-body);
+  --color: var(--mantine-color-text);
+  -webkit-font-smoothing: var(--mantine-webkit-font-smoothing);
+  -moz-osx-font-smoothing: var(--mantine-moz-font-smoothing);
+  --header-background-light: var(--mantine-color-white);
+  --header-background-dark: var(--mantine-color-dark-9);
+  --header-text-light: var(--mantine-color-black);
+  --header-text-dark: var(--mantine-color-white);
+  --header-hover-background-light: var(--mantine-color-gray-0);
+  --header-hover-background-dark: var(--mantine-color-dark-6);
+  --border-color-light: var(--mantine-color-gray-3);
+  --border-color-dark: var(--mantine-color-dark-4);
+  --tabs-color: var(--mantine-color-dark-4);
+  --carousel-control-size: 26px;
+  --carousel-controls-offset: var(--mantine-spacing-sm);
+  --rating-color: var(--mantine-color-dark-7);
+  --carousel-height: auto;
+  --mantine-Carousel-control: var(--mantine-primary-color-7);
+  --primary-gradient: linear-gradient(
+    45deg,
+    var(--mantine-color-dark-0),
+    var(--mantine-color-dark-4)
+  );
+  --secondary-gradient: linear-gradient(45deg, #4facfe, #00f2fe);
+}
+
+/* Custom styles */
+.indicators {
+  outline: solid 4px var(--mantine-color-primary-4) !important;
+}
+
+.mantine-Carousel-control {
+  background-color: var(--mantine-color-primary-7) !important;
+}
+
+/* Custom carousel indicator styles */
+.mantine-Carousel-indicator {
+  background-color: var(--mantine-color-primary-7) !important;
+  width: 16px;
+  height: 4px;
+}
+
+.mantine-Carousel-indicator[data-active] {
+  background-color: var(--mantine-color-primary-9) !important;
+}
+
+
+.slick-dots li button::before {
+  font-size: 12px !important;
+}
+
+.slick-prev.slick-disabled:before,
+.slick-next.slick-disabled:before {
+  opacity: 0.45 !important;
+}
+
+.slick-prev:before,
+.slick-next:before {
+  opacity: 0.9 !important;
+  content: "" !important;
+}
+
+@media (min-width: 1024px) {
+  .slick-dots li button:before {
+    font-size: 12px;
+  }
+  .slick-dots {
+    padding-bottom: 40px !important;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 0.1rem;
+  height: 0.1rem;
+}
+
+::-webkit-scrollbar-track {
+  background-color: rgb(var(--mantine-color-primary-7));
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--mantine-color-primary-7);
+  border-radius: 100vw;
+}
+
+input,
+select {
+  font-family: inherit;
+  color: inherit;
+  font-size: inherit;
+}
+
+input:focus,
+select:focus {
+  background-color: transparent;
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0px 1000px transparent inset;
+  box-shadow: 0 0 0px 1000px transparent inset;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+.image-container {
+  overflow: hidden;
+}
+
+.zoom-effect {
+  transition: transform 0.3s ease-in-out;
+}
+
+.zoom-effect:hover {
+  transform: scale(1.5);
+}
+
+.control {
+  background-color: var(--mantine-color-primary-7);
+  color: 4px solid var(--mantine-color-primary-7);
+  outline: 4px solid var(--mantine-color-primary-7);
+  outline-offset: -2px;
+}
+
+.indicator {
+  color: var(--mantine-color-primary-7);
+  width: 16px;
+  background-color: var(--mantine-color-primary-7);
+  height: 4px;
+}
+
+.root {
+  color: var(--mantine-color-primary-7);
+}

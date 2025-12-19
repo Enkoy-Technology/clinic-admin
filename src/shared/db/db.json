@@ -1,0 +1,18 @@
+{
+  "heroSections": [
+    {
+      "id": "1",
+      "type": "video",
+      "src": "videos/hero.mp4",
+      "title": "Your Best Smile Awaits",
+      "subtitle": "We make dental care easy and comfortable"
+    },
+    {
+      "id": "2",
+      "type": "image",
+      "src": "hero1.jpg",
+      "title": "Smile with Confidence",
+      "subtitle": "Experience modern dentistry with a personal touch"
+    }
+  ]
+}
