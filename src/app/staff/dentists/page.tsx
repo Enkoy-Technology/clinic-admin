@@ -156,7 +156,7 @@ export default function DentistsPage() {
       const doctorData: any = {
         profile: {
           user: userData,
-          role: values.role,
+          role: selectedDentist ? values.role : "DENTIST", // Always use "DENTIST" when creating
           phone_number: values.phone_number,
         },
         qualification: values.qualification,
@@ -257,6 +257,7 @@ export default function DentistsPage() {
           onClick={() => {
             setSelectedDentist(null);
             form.reset();
+            form.setFieldValue("role", "DENTIST"); // Ensure role is DENTIST when creating
             open();
           }}
         >
@@ -425,6 +426,7 @@ export default function DentistsPage() {
           close();
           setSelectedDentist(null);
           form.reset();
+          form.setFieldValue("role", "DENTIST"); // Ensure role is DENTIST when closing
         }}
         title={
           <Text fw={600} size="lg">
@@ -488,7 +490,6 @@ export default function DentistsPage() {
                     required
                     data={[
                       { value: "DENTIST", label: "Dentist" },
-                      { value: "HYGIENIST", label: "Hygienist" },
                       { value: "ASSISTANT", label: "Assistant" },
                     ]}
                     {...form.getInputProps("role")}

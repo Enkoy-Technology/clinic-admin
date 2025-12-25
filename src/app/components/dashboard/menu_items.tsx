@@ -35,9 +35,9 @@ const menuItems = [
     category: "Clinical",
     subItems: [
       { label: "Dentists", link: "/staff/dentists" },
-      { label: "Hygienists", link: "/staff/hygienists" },
-      { label: "Assistants", link: "/staff/assistants" },
-      { label: "Receptionists", link: "/staff/receptionists" },
+      // { label: "Hygienists", link: "/staff/hygienists" },
+      // { label: "Assistants", link: "/staff/assistants" },
+      // { label: "Receptionists", link: "/staff/receptionists" },
     ],
   },
   // {
