@@ -93,18 +93,19 @@ const ProtectedLayout = ({
     skip: !!userFromRedux,
   });
 
-  const { data: messagesData, error: messagesError, isLoading: messagesLoading } = useGetUnreadMessagesQuery();
+  // Only fetch messages after initial render to avoid blocking
+  const [shouldFetchMessages, setShouldFetchMessages] = useState(false);
+  const { data: messagesData } = useGetUnreadMessagesQuery(undefined, {
+    skip: !shouldFetchMessages,
+  });
 
-  // Log messages API state
+  // Delay messages fetch to not block initial render
   useEffect(() => {
-    console.log("[Layout] Messages API State:", {
-      loading: messagesLoading,
-      hasData: !!messagesData,
-      data: messagesData,
-      error: messagesError,
-      count: messagesData?.count,
-    });
-  }, [messagesData, messagesError, messagesLoading]);
+    const timer = setTimeout(() => {
+      setShouldFetchMessages(true);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Update user in Redux when fetched from API
   useEffect(() => {
@@ -212,7 +213,7 @@ const ProtectedLayout = ({
                       if (messages.length > 0) {
                         return (
                           <>
-                            {messages.slice(0, 5).map((message) => (
+                            {messages.slice(0, 2).map((message) => (
                               <Menu.Item key={message.id}>
                                 <div>
                                   <Text size="sm" fw={500}>
@@ -227,7 +228,7 @@ const ProtectedLayout = ({
                                 </div>
                               </Menu.Item>
                             ))}
-                            {unreadCount > 5 && (
+                            {unreadCount > 2 && (
                               <>
                                 <Menu.Divider />
                                 <Menu.Item

@@ -1,14 +1,13 @@
 'use client';
 import {
   ColorSchemeScript,
-  Loader,
   MantineProvider,
   MantineThemeOverride,
 } from "@mantine/core";
 import { Notifications } from "@mantine/notifications";
 import { theme as baseTheme } from "@repo/theme/mantine";
 import type { Metadata } from "next";
-import React, { Suspense } from "react";
+import React from "react";
 import { Provider } from "react-redux";
 import "./globals.css";
 import { store } from "./store";
@@ -38,18 +37,25 @@ export default function RootLayout({
           property="og:description"
           content={metadata.description as string}
         />
+        {/* Preload only critical font - use font-display: swap for instant rendering */}
+        {/* Cache is controlled via Next.js headers config */}
+        <link
+          rel="preload"
+          href="/fonts/Gilroy-Medium.ttf"
+          as="font"
+          type="font/ttf"
+          crossOrigin="anonymous"
+        />
       </head>
       <body style={{ backgroundColor: "var(--mantine-color-body)" }}>
         <MantineProvider theme={theme}>
           <ColorSchemeScript />
           <Notifications position="top-right" />
-          <Suspense fallback={<Loader />}>
-            <Provider store={store}>
-              <RootAdminLayout>
-                {children}
-              </RootAdminLayout>
-            </Provider>
-          </Suspense>
+          <Provider store={store}>
+            <RootAdminLayout>
+              {children}
+            </RootAdminLayout>
+          </Provider>
         </MantineProvider>
       </body>
     </html>

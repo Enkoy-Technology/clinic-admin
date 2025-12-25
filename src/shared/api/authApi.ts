@@ -27,8 +27,6 @@ export const baseQueryWithReauth: BaseQueryFn<
   let result = await baseQuery(args, api, extraOptions);
 
   if (result.error && result.error.status === 401) {
-    console.log("[Auth] Token expired, attempting refresh...");
-
     // Try to refresh the token
     const refreshToken = localStorage.getItem("refreshToken");
     if (refreshToken) {
@@ -48,13 +46,11 @@ export const baseQueryWithReauth: BaseQueryFn<
         // Update the token in both localStorage and Redux
         localStorage.setItem("accessToken", token);
         api.dispatch(updateAccessToken(token));
-        console.log("[Auth] Token refreshed successfully");
 
         // Retry the original query with the new token
         result = await baseQuery(args, api, extraOptions);
       } else {
         // Refresh failed, logout user
-        console.error("[Auth] Token refresh failed, logging out");
         localStorage.removeItem("accessToken");
         localStorage.removeItem("refreshToken");
         localStorage.removeItem("user");
@@ -66,7 +62,6 @@ export const baseQueryWithReauth: BaseQueryFn<
       }
     } else {
       // No refresh token, redirect to login
-      console.error("[Auth] No refresh token found, redirecting to login");
       if (typeof window !== "undefined") {
         window.location.href = "/login";
       }

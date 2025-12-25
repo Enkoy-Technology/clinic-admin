@@ -1,4 +1,4 @@
-/* Import Tailwind and Mantine styles first */
+/* Import Mantine styles - load dates and carousel only when needed via dynamic imports in components */
 @import "@mantine/core/styles.css";
 @import "@mantine/notifications/styles.css";
 @import "@mantine/dates/styles.css";
@@ -6,17 +6,8 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-/* Font-face declarations */
-@font-face {
-  font-family: "Gilroy-Bold";
-  src:
-    local("Gilroy-Bold"),
-    url(/fonts/Gilroy-Bold.ttf) format("truetype");
-  font-weight: 700;
-  font-style: normal;
-  size-adjust: true;
-}
 
+/* Font-face declarations with optimized loading */
 @font-face {
   font-family: "Gilroy-Medium";
   src:
@@ -24,6 +15,19 @@
     url(/fonts/Gilroy-Medium.ttf) format("truetype");
   font-weight: 500;
   font-style: normal;
+  font-display: swap; /* Show fallback immediately, swap when loaded */
+  size-adjust: true;
+}
+
+/* Only load other fonts when needed - lazy load */
+@font-face {
+  font-family: "Gilroy-Bold";
+  src:
+    local("Gilroy-Bold"),
+    url(/fonts/Gilroy-Bold.ttf) format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: optional; /* Only use if already downloaded */
   size-adjust: true;
 }
 
@@ -34,6 +38,7 @@
     url(/fonts/Gilroy-Light.ttf) format("truetype");
   font-weight: 300;
   font-style: normal;
+  font-display: optional; /* Only use if already downloaded */
   size-adjust: true;
 }
 

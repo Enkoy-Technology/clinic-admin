@@ -20,6 +20,7 @@ import {
 const menuItems = [
   // Main
   { icon: IconDashboard, label: "Dashboard", link: "/", category: "Main" },
+  { icon: IconBellRinging, label: "Notifications", link: "/notifications", category: "Main" },
 
   // Clinical Operations
   {
@@ -122,7 +123,6 @@ const menuItems = [
     ],
   },
   { icon: IconAlertTriangle, label: "Compliance", link: "/compliance", category: "System" },
-  { icon: IconBellRinging, label: "Notifications", link: "/notifications", category: "System" },
 ];
 
 export default menuItems;

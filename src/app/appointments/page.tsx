@@ -165,25 +165,17 @@ export default function AppointmentsPage() {
   const [updateAppointment] = useUpdateAppointmentMutation();
   const [deleteAppointment] = useDeleteAppointmentMutation();
 
-  // Debug: Log the data
-  console.log("Appointments Data:", appointmentsData);
-  console.log("Date Range:", dateRange);
-
   // Convert API appointments to time slot format
   const appointments = useMemo(() => {
     if (!appointmentsData?.appointments) {
-      console.log("No appointments data");
       return {};
     }
-
-    console.log("Processing appointments:", appointmentsData.appointments);
 
     const slots: Record<string, any> = {};
     appointmentsData.appointments.forEach((apt) => {
       // Use formatted_start_time in 24-hour format, convert to 12-hour for display
       const timeKey24 = apt.formatted_start_time; // e.g., "14:30"
       const timeKey12 = convertTo12Hour(timeKey24); // e.g., "2:30 PM"
-      console.log("Mapping appointment to time slot:", timeKey24, "->", timeKey12, apt);
 
       slots[timeKey12] = {
         ...apt,
@@ -195,7 +187,6 @@ export default function AppointmentsPage() {
       };
     });
 
-    console.log("Final time slots:", slots);
     return slots;
   }, [appointmentsData]);
 

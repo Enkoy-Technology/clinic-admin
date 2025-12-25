@@ -13,17 +13,21 @@ interface AuthGuardProps {
 export default function AuthGuard({ children }: AuthGuardProps) {
   const router = useRouter();
   const isAuthenticated = useSelector(selectIsAuthenticated);
-  const [isChecking, setIsChecking] = useState(true);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Wait for client-side hydration
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (isMounted && !isAuthenticated) {
       router.push("/login");
     }
-    setIsChecking(false);
-  }, [isAuthenticated, router]);
+  }, [isMounted, isAuthenticated, router]);
 
-  // Handle dehydration/hydration flash
-  if (isChecking) {
+  // Show loader during initial mount/hydration
+  if (!isMounted) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <Loader size="lg" color="teal" />
@@ -31,11 +35,14 @@ export default function AuthGuard({ children }: AuthGuardProps) {
     );
   }
 
+  // If not authenticated after mount, show loader while redirecting
   if (!isAuthenticated) {
-    return null; // Let the router.push handle it
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <Loader size="lg" color="teal" />
+      </div>
+    );
   }
-
-  return <>{children}</>;
 
   return <>{children}</>;
 }

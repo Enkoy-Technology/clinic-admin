@@ -34,11 +34,6 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, router]);
 
-  // Ping backend to wake it up from cold start
-  useEffect(() => {
-    fetch("/api/auth/me").catch(() => {});
-  }, []);
-
   const form = useForm({
     initialValues: {
       email: "",

@@ -37,9 +37,6 @@ export const messagesApi = createApi({
       query: () => {
         const url = `/messages/`;
         const params = { is_read: "false" };
-        console.log("[Messages API] getUnreadMessages called");
-        console.log("[Messages API] URL:", url);
-        console.log("[Messages API] Params:", params);
         return {
           url,
           params,
@@ -63,7 +60,25 @@ export const messagesApi = createApi({
         url: `/messages/`,
         params: params.is_read !== undefined ? { is_read: params.is_read.toString() } : {},
       }),
+      transformResponse: (response: MessagesApiResponse): MessagesResponse => {
+        // Handle array response
+        if (Array.isArray(response)) {
+          return {
+            count: response.length,
+            results: response,
+          };
+        }
+        // Handle object response
+        return response;
+      },
       providesTags: ["Messages"],
+    }),
+    markAsRead: builder.mutation<Message, number>({
+      query: (id) => ({
+        url: `/messages/${id}/mark-unread/`,
+        method: "POST",
+      }),
+      invalidatesTags: ["Messages"],
     }),
   }),
 });
@@ -71,5 +86,6 @@ export const messagesApi = createApi({
 export const {
   useGetUnreadMessagesQuery,
   useGetMessagesQuery,
+  useMarkAsReadMutation,
 } = messagesApi;
 
