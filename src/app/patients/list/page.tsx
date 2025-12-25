@@ -9,106 +9,46 @@ import {
   Card,
   Checkbox,
   Group,
+  Loader,
   Menu,
   Modal,
+  NumberInput,
   Select,
   Stack,
   Table,
+  Tabs,
   Text,
+  Textarea,
   TextInput,
   Title
 } from "@mantine/core";
 import { DatePickerInput } from "@mantine/dates";
+import { useForm } from "@mantine/form";
 import { useDisclosure } from "@mantine/hooks";
+import { notifications } from "@mantine/notifications";
 import {
   Calendar,
+  Download,
   Edit,
   Eye,
   FileText,
+  Home,
   Mail,
   MoreVertical,
   Phone,
   Plus,
   Search,
   Trash2,
-  User,
-  Download
+  User
 } from "lucide-react";
 import { useState } from "react";
-
-// Mock patient data
-const mockPatients = [
-  {
-    id: "P001",
-    name: "Abebe Kebede",
-    age: 34,
-    gender: "Male",
-    phone: "+251 911 234 567",
-    email: "abebe@email.com",
-    lastVisit: "2024-12-15",
-    nextAppointment: "2024-12-20",
-    status: "active",
-    avatar: "https://i.pravatar.cc/100?img=1",
-    address: "Bole, Addis Ababa",
-  },
-  {
-    id: "P002",
-    name: "Tigist Alemu",
-    age: 28,
-    gender: "Female",
-    phone: "+251 912 345 678",
-    email: "tigist@email.com",
-    lastVisit: "2024-12-14",
-    nextAppointment: "2024-12-18",
-    status: "active",
-    avatar: "https://i.pravatar.cc/100?img=2",
-    address: "Kolfe, Addis Ababa",
-  },
-  {
-    id: "P003",
-    name: "Dawit Tadesse",
-    age: 42,
-    gender: "Male",
-    phone: "+251 913 456 789",
-    email: "dawit@email.com",
-    lastVisit: "2024-12-10",
-    nextAppointment: null,
-    status: "inactive",
-    avatar: "https://i.pravatar.cc/100?img=3",
-    address: "Merkato, Addis Ababa",
-  },
-  {
-    id: "P004",
-    name: "Meron Hailu",
-    age: 31,
-    gender: "Female",
-    phone: "+251 914 567 890",
-    email: "meron@email.com",
-    lastVisit: "2024-12-16",
-    nextAppointment: "2024-12-22",
-    status: "active",
-    avatar: "https://i.pravatar.cc/100?img=4",
-    address: "Piassa, Addis Ababa",
-  },
-  {
-    id: "P005",
-    name: "Yohannes Bekele",
-    age: 55,
-    gender: "Male",
-    phone: "+251 915 678 901",
-    email: "yohannes@email.com",
-    lastVisit: "2024-12-12",
-    nextAppointment: "2024-12-19",
-    status: "active",
-    avatar: "https://i.pravatar.cc/100?img=5",
-    address: "Megenagna, Addis Ababa",
-  },
-];
+import { useCreatePatientMutation, useGetPatientsQuery, useUpdatePatientMutation, type CreatePatientRequest } from "../../../shared/api/patientsApi";
 
 const statusColors: Record<string, string> = {
+  ACTIVE: "green",
+  INACTIVE: "gray",
   active: "green",
   inactive: "gray",
-  new: "blue",
 };
 
 export default function PatientListPage() {
@@ -118,17 +58,61 @@ export default function PatientListPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string | null>("all");
   const [genderFilter, setGenderFilter] = useState<string | null>("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [perPage] = useState(10);
+  const [selectedPatientIds, setSelectedPatientIds] = useState<number[]>([]);
+
+  const [createPatient, { isLoading: isCreating }] = useCreatePatientMutation();
+  const [updatePatient, { isLoading: isUpdating }] = useUpdatePatientMutation();
+  const { data: patientsData, isLoading: isLoadingPatients, refetch } = useGetPatientsQuery({
+    page: currentPage,
+    per_page: perPage,
+  });
+
+  const form = useForm({
+    initialValues: {
+      first_name: "",
+      last_name: "",
+      email: "",
+      phone_number: "",
+      role: "PATIENT",
+      gender: "MALE" as "MALE" | "FEMALE",
+      age: undefined as number | undefined,
+      dob: null as Date | null,
+      status: "ACTIVE" as "ACTIVE" | "INACTIVE",
+      note: "",
+      // Address fields
+      street: "",
+      city: "",
+      state: "",
+    },
+    validate: {
+      first_name: (value) => (!value ? "First name is required" : null),
+      last_name: (value) => (!value ? "Last name is required" : null),
+      email: (value) => (value && !/^\S+@\S+$/.test(value) ? "Invalid email" : null),
+      phone_number: (value) => (!value ? "Phone number is required" : null),
+      gender: (value) => (!value ? "Gender is required" : null),
+    },
+  });
+
+  // Get patients from API
+  const patients = patientsData?.results || [];
 
   // Filter patients
-  const filteredPatients = mockPatients.filter((patient) => {
+  const filteredPatients = patients.filter((patient) => {
+    const fullName = `${patient.profile?.user?.first_name || ""} ${patient.profile?.user?.last_name || ""}`.toLowerCase();
     const matchesSearch =
-      patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      patient.phone.includes(searchQuery) ||
-      patient.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      patient.email.toLowerCase().includes(searchQuery.toLowerCase());
+      fullName.includes(searchQuery.toLowerCase()) ||
+      patient.profile?.phone_number?.includes(searchQuery) ||
+      patient.profile?.user?.email?.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesStatus = statusFilter === "all" || patient.status === statusFilter;
-    const matchesGender = genderFilter === "all" || patient.gender === genderFilter;
+    const patientStatus = patient.status?.toUpperCase();
+    const matchesStatus = statusFilter === "all" ||
+      (statusFilter === "active" && patientStatus === "ACTIVE") ||
+      (statusFilter === "inactive" && patientStatus === "INACTIVE");
+    const matchesGender = genderFilter === "all" ||
+      (genderFilter === "Male" && patient.gender === "MALE") ||
+      (genderFilter === "Female" && patient.gender === "FEMALE");
 
     return matchesSearch && matchesStatus && matchesGender;
   });
@@ -140,7 +124,147 @@ export default function PatientListPage() {
 
   const handleEditPatient = (patient: any) => {
     setSelectedPatient(patient);
+    if (patient) {
+      form.setValues({
+        first_name: patient.profile?.user?.first_name || "",
+        last_name: patient.profile?.user?.last_name || "",
+        email: patient.profile?.user?.email || "",
+        phone_number: patient.profile?.phone_number || "",
+        role: patient.profile?.role || "PATIENT",
+        gender: patient.gender || "MALE",
+        age: patient.age,
+        dob: patient.dob ? new Date(patient.dob) : null,
+        status: patient.status || "ACTIVE",
+        note: patient.note || "",
+        street: patient.address?.street || "",
+        city: patient.address?.city || "",
+        state: patient.address?.state || "",
+      });
+    }
     open();
+  };
+
+  const handleSelectPatient = (patientId: number) => {
+    setSelectedPatientIds((prev) =>
+      prev.includes(patientId)
+        ? prev.filter((id) => id !== patientId)
+        : [...prev, patientId]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedPatientIds.length === filteredPatients.length) {
+      setSelectedPatientIds([]);
+    } else {
+      setSelectedPatientIds(filteredPatients.map((p) => p.id));
+    }
+  };
+
+  const allSelected = filteredPatients.length > 0 && selectedPatientIds.length === filteredPatients.length;
+  const someSelected = selectedPatientIds.length > 0 && selectedPatientIds.length < filteredPatients.length;
+
+  const handleSubmit = async (values: typeof form.values) => {
+    try {
+      // Format date of birth (optional if age is provided)
+      const dob = values.dob ? values.dob.toISOString().split("T")[0] : undefined;
+
+      // Build user object - email is optional
+      const userData: any = {
+        first_name: values.first_name,
+        last_name: values.last_name,
+      };
+      if (values.email) userData.email = values.email;
+
+      // Build address object if any address fields are provided
+      const addressData: any = {};
+      if (values.street) addressData.street = values.street;
+      if (values.city) addressData.city = values.city;
+      if (values.state) addressData.state = values.state;
+
+      const patientData: any = {
+        profile: {
+          user: userData,
+          role: selectedPatient ? values.role : "PATIENT", // Always use "PATIENT" when creating
+          phone_number: values.phone_number,
+        },
+        gender: values.gender,
+        status: values.status,
+      };
+
+      // Add optional fields if provided
+      if (dob) patientData.dob = dob;
+      if (values.age) patientData.age = values.age;
+      if (values.note) patientData.note = values.note;
+      if (Object.keys(addressData).length > 0) patientData.address = addressData;
+
+      if (selectedPatient) {
+        // Update patient
+        await updatePatient({
+          id: selectedPatient.id,
+          data: patientData,
+        }).unwrap();
+        notifications.show({
+          title: "Success",
+          message: "Patient updated successfully",
+          color: "green",
+        });
+      } else {
+        // Create patient
+        await createPatient(patientData as CreatePatientRequest).unwrap();
+        notifications.show({
+          title: "Success",
+          message: "Patient created successfully",
+          color: "green",
+        });
+      }
+
+      form.reset();
+      close();
+      setSelectedPatient(null);
+      refetch(); // Refetch patients list
+    } catch (error: any) {
+      // Handle field-specific errors from backend
+      const errorData = error?.data || {};
+      const fieldErrors: string[] = [];
+
+      // Extract field errors (format: {"field_name": ["error message"]})
+      Object.keys(errorData).forEach((field) => {
+        const fieldError = errorData[field];
+        if (Array.isArray(fieldError)) {
+          const errorMessage = fieldError[0] || fieldError;
+          fieldErrors.push(`${field}: ${errorMessage}`);
+
+          // Map backend field names to form field names
+          let formFieldName = field;
+          if (field.startsWith("profile.user.")) {
+            formFieldName = field.replace("profile.user.", "");
+          } else if (field.startsWith("profile.")) {
+            formFieldName = field.replace("profile.", "");
+          } else if (field.startsWith("address.")) {
+            formFieldName = field.replace("address.", "");
+          }
+
+          // Set form field error if the field exists in the form
+          if (formFieldName in form.values) {
+            form.setFieldError(formFieldName, errorMessage);
+          }
+        } else if (typeof fieldError === "string") {
+          fieldErrors.push(`${field}: ${fieldError}`);
+        }
+      });
+
+      // Show notification with all errors
+      const errorMessage = fieldErrors.length > 0
+        ? fieldErrors.join("\n")
+        : errorData?.detail || errorData?.message || "Failed to save patient";
+
+      notifications.show({
+        title: "Error",
+        message: errorMessage,
+        color: "red",
+        autoClose: 5000,
+      });
+    }
   };
 
   return (
@@ -161,206 +285,243 @@ export default function PatientListPage() {
           <Button
             leftSection={<Plus size={18} />}
             className="bg-[#19b5af] hover:bg-[#14918c]"
-            onClick={open}
+            onClick={() => {
+              setSelectedPatient(null);
+              form.reset();
+              form.setFieldValue("role", "PATIENT"); // Ensure role is PATIENT when creating
+              open();
+            }}
           >
             Add Patient
           </Button>
         </Group>
       </Group>
 
-      {/* Stats Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        {[
-          { label: "Total Patients", value: mockPatients.length.toString(), color: "bg-blue-500" },
-          { label: "Active", value: mockPatients.filter(p => p.status === "active").length.toString(), color: "bg-green-500" },
-          { label: "Male", value: mockPatients.filter(p => p.gender === "Male").length.toString(), color: "bg-purple-500" },
-          { label: "Female", value: mockPatients.filter(p => p.gender === "Female").length.toString(), color: "bg-pink-500" },
-        ].map((stat, index) => (
-          <Card key={index} shadow="sm" p="md" className="border border-gray-200">
-            <Group justify="space-between">
-              <div>
-                <Text size="sm" c="dimmed" mb={4}>{stat.label}</Text>
-                <Text size="xl" fw={700}>{stat.value}</Text>
-              </div>
-              <div className={`${stat.color} w-2 h-full rounded-full`} />
+      {isLoadingPatients ? (
+        <div className="flex justify-center items-center py-16">
+          <Loader size="lg" color="teal" />
+        </div>
+      ) : (
+        <>
+          {/* Stats Summary */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            {[
+              { label: "Total Patients", value: (patientsData?.count || 0).toString(), color: "bg-blue-500" },
+              { label: "Active", value: patients.filter(p => p.status?.toUpperCase() === "ACTIVE").length.toString(), color: "bg-green-500" },
+              { label: "Male", value: patients.filter(p => p.gender === "MALE").length.toString(), color: "bg-purple-500" },
+              { label: "Female", value: patients.filter(p => p.gender === "FEMALE").length.toString(), color: "bg-pink-500" },
+            ].map((stat, index) => (
+              <Card key={index} shadow="sm" p="md" className="border border-gray-200">
+                <Group justify="space-between">
+                  <div>
+                    <Text size="sm" c="dimmed" mb={4}>{stat.label}</Text>
+                    <Text size="xl" fw={700}>{stat.value}</Text>
+                  </div>
+                  <div className={`${stat.color} w-2 h-full rounded-full`} />
+                </Group>
+              </Card>
+            ))}
+          </div>
+
+          {/* Filters */}
+          <Card shadow="sm" p="md" mb="md" className="border border-gray-200">
+            <Group>
+              <TextInput
+                placeholder="Search by name, phone, ID, or email..."
+                leftSection={<Search size={16} />}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.currentTarget.value)}
+                className="flex-1"
+              />
+              <Select
+                placeholder="Status"
+                data={[
+                  { value: "all", label: "All Status" },
+                  { value: "active", label: "Active" },
+                  { value: "inactive", label: "Inactive" },
+                ]}
+                value={statusFilter}
+                onChange={setStatusFilter}
+                clearable
+                w={150}
+              />
+              <Select
+                placeholder="Gender"
+                data={[
+                  { value: "all", label: "All Genders" },
+                  { value: "Male", label: "Male" },
+                  { value: "Female", label: "Female" },
+                ]}
+                value={genderFilter}
+                onChange={setGenderFilter}
+                clearable
+                w={150}
+              />
             </Group>
           </Card>
-        ))}
-      </div>
 
-      {/* Filters */}
-      <Card shadow="sm" p="md" mb="md" className="border border-gray-200">
-        <Group>
-          <TextInput
-            placeholder="Search by name, phone, ID, or email..."
-            leftSection={<Search size={16} />}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.currentTarget.value)}
-            className="flex-1"
-          />
-          <Select
-            placeholder="Status"
-            data={[
-              { value: "all", label: "All Status" },
-              { value: "active", label: "Active" },
-              { value: "inactive", label: "Inactive" },
-              { value: "new", label: "New" },
-            ]}
-            value={statusFilter}
-            onChange={setStatusFilter}
-            clearable
-            w={150}
-          />
-          <Select
-            placeholder="Gender"
-            data={[
-              { value: "all", label: "All Genders" },
-              { value: "Male", label: "Male" },
-              { value: "Female", label: "Female" },
-            ]}
-            value={genderFilter}
-            onChange={setGenderFilter}
-            clearable
-            w={150}
-          />
-        </Group>
-      </Card>
-
-      {/* Patients Table */}
-      <Card shadow="sm" p="lg" className="border border-gray-200">
-        <Table highlightOnHover verticalSpacing="md">
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>
-                <Checkbox />
-              </Table.Th>
-              <Table.Th>Patient ID</Table.Th>
-              <Table.Th>Patient</Table.Th>
-              <Table.Th>Contact</Table.Th>
-              <Table.Th>Age/Gender</Table.Th>
-              <Table.Th>Last Visit</Table.Th>
-              <Table.Th>Next Appointment</Table.Th>
-              <Table.Th>Status</Table.Th>
-              <Table.Th>Actions</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {filteredPatients.length === 0 ? (
+          {/* Patients Table */}
+          <Card shadow="sm" p="lg" className="border border-gray-200">
+          <Table highlightOnHover verticalSpacing="md">
+            <Table.Thead>
               <Table.Tr>
-                <Table.Td colSpan={9}>
-                  <Text ta="center" py="xl" c="dimmed">
-                    No patients found
-                  </Text>
-                </Table.Td>
+                <Table.Th>
+                  <Checkbox
+                    checked={allSelected}
+                    indeterminate={someSelected}
+                    onChange={handleSelectAll}
+                  />
+                </Table.Th>
+                <Table.Th>Patient ID</Table.Th>
+                <Table.Th>Patient</Table.Th>
+                <Table.Th>Contact</Table.Th>
+                <Table.Th>Age/Gender</Table.Th>
+                <Table.Th>Status</Table.Th>
+                <Table.Th>Actions</Table.Th>
               </Table.Tr>
-            ) : (
-              filteredPatients.map((patient) => (
-                <Table.Tr key={patient.id}>
-                  <Table.Td>
-                    <Checkbox />
-                  </Table.Td>
-                  <Table.Td>
-                    <Badge variant="light" color="gray">{patient.id}</Badge>
-                  </Table.Td>
-                  <Table.Td>
-                    <Group gap="xs">
-                      <Avatar src={patient.avatar} size={40} radius="xl" />
-                      <div>
-                        <Text size="sm" fw={500}>{patient.name}</Text>
-                        <Text size="xs" c="dimmed">{patient.address}</Text>
-                      </div>
-                    </Group>
-                  </Table.Td>
-                  <Table.Td>
-                    <Stack gap={4}>
-                      <Group gap={6}>
-                        <Phone size={14} className="text-gray-400" />
-                        <Text size="xs">{patient.phone}</Text>
-                      </Group>
-                      <Group gap={6}>
-                        <Mail size={14} className="text-gray-400" />
-                        <Text size="xs">{patient.email}</Text>
-                      </Group>
-                    </Stack>
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="sm">{patient.age} / {patient.gender}</Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Group gap={6}>
-                      <Calendar size={14} className="text-gray-400" />
-                      <Text size="xs">{patient.lastVisit}</Text>
-                    </Group>
-                  </Table.Td>
-                  <Table.Td>
-                    {patient.nextAppointment ? (
-                      <Group gap={6}>
-                        <Calendar size={14} className="text-[#19b5af]" />
-                        <Text size="xs" className="text-[#19b5af]">{patient.nextAppointment}</Text>
-                      </Group>
-                    ) : (
-                      <Text size="xs" c="dimmed">None</Text>
-                    )}
-                  </Table.Td>
-                  <Table.Td>
-                    <Badge
-                      variant="light"
-                      color={statusColors[patient.status]}
-                      size="sm"
-                      className="capitalize"
-                    >
-                      {patient.status}
-                    </Badge>
-                  </Table.Td>
-                  <Table.Td>
-                    <Group gap="xs">
-                      <ActionIcon
-                        variant="light"
-                        color="blue"
-                        onClick={() => handleViewPatient(patient)}
-                      >
-                        <Eye size={16} />
-                      </ActionIcon>
-                      <ActionIcon
-                        variant="light"
-                        color="teal"
-                        onClick={() => handleEditPatient(patient)}
-                      >
-                        <Edit size={16} />
-                      </ActionIcon>
-                      <Menu shadow="md" width={200}>
-                        <Menu.Target>
-                          <ActionIcon variant="light" color="gray">
-                            <MoreVertical size={16} />
-                          </ActionIcon>
-                        </Menu.Target>
-                        <Menu.Dropdown>
-                          <Menu.Item leftSection={<FileText size={16} />}>
-                            View Records
-                          </Menu.Item>
-                          <Menu.Item leftSection={<Calendar size={16} />}>
-                            Book Appointment
-                          </Menu.Item>
-                          <Menu.Item leftSection={<Phone size={16} />}>
-                            Call Patient
-                          </Menu.Item>
-                          <Menu.Item leftSection={<Mail size={16} />}>
-                            Send Email
-                          </Menu.Item>
-                          <Menu.Divider />
-                          <Menu.Item leftSection={<Trash2 size={16} />} color="red">
-                            Delete
-                          </Menu.Item>
-                        </Menu.Dropdown>
-                      </Menu>
-                    </Group>
+            </Table.Thead>
+              <Table.Tbody>
+              {filteredPatients.length === 0 ? (
+                <Table.Tr>
+                  <Table.Td colSpan={7}>
+                    <Text ta="center" py="xl" c="dimmed">
+                      No patients found
+                    </Text>
                   </Table.Td>
                 </Table.Tr>
-              ))
-            )}
-          </Table.Tbody>
-        </Table>
-      </Card>
+              ) : (
+                filteredPatients.map((patient) => {
+                  const fullName = `${patient.profile?.user?.first_name || ""} ${patient.profile?.user?.last_name || ""}`.trim() || patient.name || "N/A";
+                  const address = patient.address ?
+                    [patient.address.street, patient.address.city, patient.address.state].filter(Boolean).join(", ") :
+                    "N/A";
+                  return (
+                    <Table.Tr key={patient.id}>
+                      <Table.Td>
+                        <Checkbox
+                          checked={selectedPatientIds.includes(patient.id)}
+                          onChange={() => handleSelectPatient(patient.id)}
+                        />
+                      </Table.Td>
+                      <Table.Td>
+                        <Badge variant="light" color="gray">#{patient.id}</Badge>
+                      </Table.Td>
+                      <Table.Td>
+                        <Group gap="xs">
+                          <Avatar src={patient.profile_picture} size={40} radius="xl" />
+                          <div>
+                            <Text size="sm" fw={500}>{fullName}</Text>
+                            <Text size="xs" c="dimmed">{address}</Text>
+                          </div>
+                        </Group>
+                      </Table.Td>
+                      <Table.Td>
+                        <Stack gap={4}>
+                          <Group gap={6}>
+                            <Phone size={14} className="text-gray-400" />
+                            <Text size="xs">{patient.profile?.phone_number || "N/A"}</Text>
+                          </Group>
+                          {patient.profile?.user?.email && (
+                            <Group gap={6}>
+                              <Mail size={14} className="text-gray-400" />
+                              <Text size="xs">{patient.profile.user.email}</Text>
+                            </Group>
+                          )}
+                        </Stack>
+                      </Table.Td>
+                      <Table.Td>
+                        <Text size="sm">
+                          {patient.age ? `${patient.age} / ` : ""}{patient.gender || "N/A"}
+                        </Text>
+                      </Table.Td>
+                      <Table.Td>
+                        <Badge
+                          variant="light"
+                          color={statusColors[patient.status || ""] || "gray"}
+                          size="sm"
+                          className="capitalize"
+                        >
+                          {patient.status || "N/A"}
+                        </Badge>
+                      </Table.Td>
+                      <Table.Td>
+                        <Group gap="xs">
+                          <ActionIcon
+                            variant="light"
+                            color="blue"
+                            onClick={() => handleViewPatient(patient)}
+                          >
+                            <Eye size={16} />
+                          </ActionIcon>
+                          <ActionIcon
+                            variant="light"
+                            color="teal"
+                            onClick={() => handleEditPatient(patient)}
+                          >
+                            <Edit size={16} />
+                          </ActionIcon>
+                          <Menu shadow="md" width={200}>
+                            <Menu.Target>
+                              <ActionIcon variant="light" color="gray">
+                                <MoreVertical size={16} />
+                              </ActionIcon>
+                            </Menu.Target>
+                            <Menu.Dropdown>
+                              <Menu.Item leftSection={<FileText size={16} />}>
+                                View Records
+                              </Menu.Item>
+                              <Menu.Item leftSection={<Calendar size={16} />}>
+                                Book Appointment
+                              </Menu.Item>
+                              <Menu.Item leftSection={<Phone size={16} />}>
+                                Call Patient
+                              </Menu.Item>
+                              <Menu.Item leftSection={<Mail size={16} />}>
+                                Send Email
+                              </Menu.Item>
+                              <Menu.Divider />
+                              <Menu.Item leftSection={<Trash2 size={16} />} color="red">
+                                Delete
+                              </Menu.Item>
+                            </Menu.Dropdown>
+                          </Menu>
+                        </Group>
+                      </Table.Td>
+                    </Table.Tr>
+                  );
+                })
+              )}
+            </Table.Tbody>
+          </Table>
+          {/* Pagination */}
+        {patientsData && patientsData.total_pages > 1 && (
+          <Group justify="space-between" mt="md">
+            <Text size="sm" c="dimmed">
+              Page {patientsData.current_page} of {patientsData.total_pages}
+            </Text>
+            <Group gap="xs">
+              <Button
+                variant="light"
+                size="sm"
+                disabled={!patientsData.links.previous}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="light"
+                size="sm"
+                disabled={!patientsData.links.next}
+                onClick={() => setCurrentPage((p) => Math.min(patientsData.total_pages, p + 1))}
+              >
+                Next
+              </Button>
+            </Group>
+          </Group>
+        )}
+          </Card>
+        </>
+      )}
 
       {/* Add/Edit Patient Modal */}
       <Modal
@@ -368,86 +529,155 @@ export default function PatientListPage() {
         onClose={() => {
           close();
           setSelectedPatient(null);
+          form.reset();
+          form.setFieldValue("role", "PATIENT"); // Ensure role is PATIENT when closing
         }}
         title={
           <Text fw={600} size="lg">
-            {selectedPatient ? "Edit Patient" : "New Patient"}
+            {selectedPatient ? "Edit Patient" : "Add Patient"}
           </Text>
         }
         size="lg"
       >
-        <Stack gap="md">
-          <TextInput
-            label="Full Name"
-            placeholder="Enter patient name"
-            required
-            leftSection={<User size={16} />}
-            defaultValue={selectedPatient?.name}
-          />
-          <Group grow>
-            <TextInput
-              label="Age"
-              placeholder="Age"
-              type="number"
-              required
-              defaultValue={selectedPatient?.age}
-            />
-            <Select
-              label="Gender"
-              placeholder="Select gender"
-              required
-              data={["Male", "Female", "Other"]}
-              defaultValue={selectedPatient?.gender}
-            />
-          </Group>
-          <Group grow>
-            <TextInput
-              label="Phone Number"
-              placeholder="+251 911 234 567"
-              required
-              leftSection={<Phone size={16} />}
-              defaultValue={selectedPatient?.phone}
-            />
-            <TextInput
-              label="Email"
-              placeholder="patient@email.com"
-              leftSection={<Mail size={16} />}
-              defaultValue={selectedPatient?.email}
-            />
-          </Group>
-          <TextInput
-            label="Address"
-            placeholder="Enter address"
-            required
-            defaultValue={selectedPatient?.address}
-          />
-          <DatePickerInput
-            label="Date of Birth"
-            placeholder="Select date"
-            leftSection={<Calendar size={16} />}
-          />
-          <Select
-            label="Blood Group"
-            placeholder="Select blood group"
-            data={["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]}
-          />
-          <TextInput
-            label="Emergency Contact"
-            placeholder="Name and phone number"
-            leftSection={<Phone size={16} />}
-          />
-          <Group justify="flex-end" mt="md">
-            <Button variant="light" onClick={() => {
-              close();
-              setSelectedPatient(null);
-            }}>
+        <form onSubmit={form.onSubmit(handleSubmit)}>
+          <Tabs defaultValue="basic">
+            <Tabs.List grow mb="md">
+              <Tabs.Tab value="basic" leftSection={<User size={16} />}>
+                Basic Info
+              </Tabs.Tab>
+              <Tabs.Tab value="address" leftSection={<Home size={16} />}>
+                Address
+              </Tabs.Tab>
+            </Tabs.List>
+
+            <Tabs.Panel value="basic" pt="md">
+              <Stack gap="md">
+                <Group grow>
+                  <TextInput
+                    label="First Name"
+                    placeholder="John"
+                    required
+                    leftSection={<User size={16} />}
+                    {...form.getInputProps("first_name")}
+                  />
+                  <TextInput
+                    label="Last Name"
+                    placeholder="Doe"
+                    required
+                    leftSection={<User size={16} />}
+                    {...form.getInputProps("last_name")}
+                  />
+                </Group>
+
+                <Group grow>
+                  <TextInput
+                    label="Phone Number"
+                    placeholder="+251 911 234 567"
+                    required
+                    leftSection={<Phone size={16} />}
+                    {...form.getInputProps("phone_number")}
+                  />
+                  <TextInput
+                    label="Email (Optional)"
+                    placeholder="patient@email.com"
+                    leftSection={<Mail size={16} />}
+                    {...form.getInputProps("email")}
+                  />
+                </Group>
+
+                <Group grow>
+                  <NumberInput
+                    label="Age (Optional)"
+                    placeholder="Enter age"
+                    min={0}
+                    max={150}
+                    value={form.values.age}
+                    onChange={(value) => form.setFieldValue("age", typeof value === "number" ? value : undefined)}
+                  />
+                  <Select
+                    label="Gender"
+                    placeholder="Select gender"
+                    required
+                    data={[
+                      { value: "MALE", label: "Male" },
+                      { value: "FEMALE", label: "Female" },
+                    ]}
+                    {...form.getInputProps("gender")}
+                  />
+                </Group>
+
+                <Group grow>
+                  <DatePickerInput
+                    label="Date of Birth (Optional)"
+                    placeholder="Select date"
+                    leftSection={<Calendar size={16} />}
+                    value={form.values.dob}
+                    onChange={(date) => form.setFieldValue("dob", date)}
+                  />
+                  <Select
+                    label="Status"
+                    placeholder="Select status"
+                    data={[
+                      { value: "ACTIVE", label: "Active" },
+                      { value: "INACTIVE", label: "Inactive" },
+                    ]}
+                    {...form.getInputProps("status")}
+                  />
+                </Group>
+
+                <Textarea
+                  label="Note (Optional)"
+                  placeholder="Additional notes about the patient"
+                  rows={3}
+                  {...form.getInputProps("note")}
+                />
+              </Stack>
+            </Tabs.Panel>
+
+            <Tabs.Panel value="address" pt="md">
+              <Stack gap="md">
+                <TextInput
+                  label="Street (Optional)"
+                  placeholder="Street address"
+                  {...form.getInputProps("street")}
+                />
+
+                <Group grow>
+                  <TextInput
+                    label="City (Optional)"
+                    placeholder="City"
+                    {...form.getInputProps("city")}
+                  />
+                  <TextInput
+                    label="State (Optional)"
+                    placeholder="State/Province"
+                    {...form.getInputProps("state")}
+                  />
+                </Group>
+              </Stack>
+            </Tabs.Panel>
+          </Tabs>
+
+          <Group justify="flex-end" mt="xl">
+            <Button
+              variant="light"
+              onClick={() => {
+                close();
+                setSelectedPatient(null);
+                form.reset();
+              }}
+            >
               Cancel
             </Button>
-            <Button className="bg-[#19b5af] hover:bg-[#14918c]">
-              {selectedPatient ? "Update" : "Create"} Patient
+            <Button
+              type="submit"
+              className="bg-[#19b5af] hover:bg-[#14918c]"
+              loading={isCreating || isUpdating}
+            >
+              {selectedPatient ? "Update" : "Add "} Patient Info
             </Button>
           </Group>
-        </Stack>
+        </form>
       </Modal>
 
       {/* View Patient Modal */}
@@ -461,88 +691,96 @@ export default function PatientListPage() {
         }
         size="md"
       >
-        {selectedPatient && (
-          <Stack gap="md">
-            <Group>
-              <Avatar src={selectedPatient.avatar} size={80} radius="xl" />
-              <div>
-                <Text size="lg" fw={600}>{selectedPatient.name}</Text>
-                <Badge variant="light" color={statusColors[selectedPatient.status]} className="capitalize">
-                  {selectedPatient.status}
-                </Badge>
-                <Text size="sm" c="dimmed" mt={4}>Patient ID: {selectedPatient.id}</Text>
-              </div>
-            </Group>
-
-            <Card className="bg-gray-50">
-              <Group grow>
+        {selectedPatient && (() => {
+          const fullName = `${selectedPatient.profile?.user?.first_name || ""} ${selectedPatient.profile?.user?.last_name || ""}`.trim() || selectedPatient.name || "N/A";
+          const address = selectedPatient.address ?
+            [selectedPatient.address.street, selectedPatient.address.city, selectedPatient.address.state].filter(Boolean).join(", ") :
+            "N/A";
+          return (
+            <Stack gap="md">
+              <Group>
+                <Avatar src={selectedPatient.profile_picture} size={80} radius="xl" />
                 <div>
-                  <Text size="xs" c="dimmed" mb={4}>Age</Text>
-                  <Text size="sm" fw={500}>{selectedPatient.age}</Text>
-                </div>
-                <div>
-                  <Text size="xs" c="dimmed" mb={4}>Gender</Text>
-                  <Text size="sm" fw={500}>{selectedPatient.gender}</Text>
+                  <Text size="lg" fw={600}>{fullName}</Text>
+                  <Badge variant="light" color={statusColors[selectedPatient.status || ""] || "gray"} className="capitalize">
+                    {selectedPatient.status || "N/A"}
+                  </Badge>
+                  <Text size="sm" c="dimmed" mt={4}>Patient ID: #{selectedPatient.id}</Text>
                 </div>
               </Group>
-            </Card>
 
-            <div>
-              <Text size="sm" c="dimmed" mb={4}>Contact Information</Text>
-              <Stack gap={8}>
-                <Group gap={8}>
-                  <Phone size={16} className="text-gray-400" />
-                  <Text size="sm">{selectedPatient.phone}</Text>
+              <Card className="bg-gray-50">
+                <Group grow>
+                  <div>
+                    <Text size="xs" c="dimmed" mb={4}>Age</Text>
+                    <Text size="sm" fw={500}>{selectedPatient.age || "N/A"}</Text>
+                  </div>
+                  <div>
+                    <Text size="xs" c="dimmed" mb={4}>Gender</Text>
+                    <Text size="sm" fw={500}>{selectedPatient.gender || "N/A"}</Text>
+                  </div>
                 </Group>
-                <Group gap={8}>
-                  <Mail size={16} className="text-gray-400" />
-                  <Text size="sm">{selectedPatient.email}</Text>
-                </Group>
-              </Stack>
-            </div>
+              </Card>
 
-            <div>
-              <Text size="sm" c="dimmed" mb={4}>Address</Text>
-              <Text size="sm">{selectedPatient.address}</Text>
-            </div>
-
-            <Group grow>
               <div>
-                <Text size="sm" c="dimmed" mb={4}>Last Visit</Text>
-                <Group gap={6}>
-                  <Calendar size={16} className="text-gray-400" />
-                  <Text size="sm">{selectedPatient.lastVisit}</Text>
-                </Group>
-              </div>
-              <div>
-                <Text size="sm" c="dimmed" mb={4}>Next Appointment</Text>
-                {selectedPatient.nextAppointment ? (
-                  <Group gap={6}>
-                    <Calendar size={16} className="text-[#19b5af]" />
-                    <Text size="sm" className="text-[#19b5af]">{selectedPatient.nextAppointment}</Text>
+                <Text size="sm" c="dimmed" mb={4}>Contact Information</Text>
+                <Stack gap={8}>
+                  <Group gap={8}>
+                    <Phone size={16} className="text-gray-400" />
+                    <Text size="sm">{selectedPatient.profile?.phone_number || "N/A"}</Text>
                   </Group>
-                ) : (
-                  <Text size="sm" c="dimmed">None scheduled</Text>
-                )}
+                  {selectedPatient.profile?.user?.email && (
+                    <Group gap={8}>
+                      <Mail size={16} className="text-gray-400" />
+                      <Text size="sm">{selectedPatient.profile.user.email}</Text>
+                    </Group>
+                  )}
+                </Stack>
               </div>
-            </Group>
 
-            <Group justify="flex-end" mt="md">
-              <Button variant="light" onClick={closeView}>
-                Close
-              </Button>
-              <Button
-                className="bg-[#19b5af] hover:bg-[#14918c]"
-                onClick={() => {
-                  closeView();
-                  handleEditPatient(selectedPatient);
-                }}
-              >
-                Edit Patient
-              </Button>
-            </Group>
-          </Stack>
-        )}
+              {address !== "N/A" && (
+                <div>
+                  <Text size="sm" c="dimmed" mb={4}>Address</Text>
+                  <Text size="sm">{address}</Text>
+                </div>
+              )}
+
+              {selectedPatient.note && (
+                <div>
+                  <Text size="sm" c="dimmed" mb={4}>Note</Text>
+                  <Card className="bg-gray-50">
+                    <Text size="sm">{selectedPatient.note}</Text>
+                  </Card>
+                </div>
+              )}
+
+              {selectedPatient.dob && (
+                <div>
+                  <Text size="sm" c="dimmed" mb={4}>Date of Birth</Text>
+                  <Group gap={6}>
+                    <Calendar size={16} className="text-gray-400" />
+                    <Text size="sm">{selectedPatient.dob}</Text>
+                  </Group>
+                </div>
+              )}
+
+              <Group justify="flex-end" mt="md">
+                <Button variant="light" onClick={closeView}>
+                  Close
+                </Button>
+                <Button
+                  className="bg-[#19b5af] hover:bg-[#14918c]"
+                  onClick={() => {
+                    closeView();
+                    handleEditPatient(selectedPatient);
+                  }}
+                >
+                  Edit Patient
+                </Button>
+              </Group>
+            </Stack>
+          );
+        })()}
       </Modal>
     </Box>
   );

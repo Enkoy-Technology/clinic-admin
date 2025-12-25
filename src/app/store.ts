@@ -5,6 +5,7 @@ import { authApi } from "../shared/api/authApi";
 import { appointmentsApi } from "../shared/api/appointmentsApi";
 import { messagesApi } from "../shared/api/messagesApi";
 import { doctorsApi } from "../shared/api/doctorsApi";
+import { patientsApi } from "../shared/api/patientsApi";
 import authReducer from "../shared/slices/authSlice";
 
 export const store = configureStore({
@@ -13,6 +14,7 @@ export const store = configureStore({
     [appointmentsApi.reducerPath]: appointmentsApi.reducer,
     [messagesApi.reducerPath]: messagesApi.reducer,
     [doctorsApi.reducerPath]: doctorsApi.reducer,
+    [patientsApi.reducerPath]: patientsApi.reducer,
     auth: authReducer,
   },
   middleware: (getDefaultMiddleware) =>
@@ -20,7 +22,8 @@ export const store = configureStore({
       authApi.middleware,
       appointmentsApi.middleware,
       messagesApi.middleware,
-      doctorsApi.middleware
+      doctorsApi.middleware,
+      patientsApi.middleware
     ),
 });
 
