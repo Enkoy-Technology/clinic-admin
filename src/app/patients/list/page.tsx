@@ -42,7 +42,7 @@ import {
   User
 } from "lucide-react";
 import { useState } from "react";
-import { useCreatePatientMutation, useGetPatientsQuery, useUpdatePatientMutation, type CreatePatientRequest } from "../../../shared/api/patientsApi";
+import { useCreatePatientMutation, useDeletePatientMutation, useGetPatientsQuery, useUpdatePatientMutation, type CreatePatientRequest } from "../../../shared/api/patientsApi";
 
 const statusColors: Record<string, string> = {
   ACTIVE: "green",
@@ -54,6 +54,8 @@ const statusColors: Record<string, string> = {
 export default function PatientListPage() {
   const [opened, { open, close }] = useDisclosure(false);
   const [viewModalOpened, { open: openView, close: closeView }] = useDisclosure(false);
+  const [deleteModalOpened, { open: openDeleteModal, close: closeDeleteModal }] = useDisclosure(false);
+  const [patientToDelete, setPatientToDelete] = useState<any>(null);
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string | null>("all");
@@ -64,6 +66,7 @@ export default function PatientListPage() {
 
   const [createPatient, { isLoading: isCreating }] = useCreatePatientMutation();
   const [updatePatient, { isLoading: isUpdating }] = useUpdatePatientMutation();
+  const [deletePatient, { isLoading: isDeleting }] = useDeletePatientMutation();
   const { data: patientsData, isLoading: isLoadingPatients, refetch } = useGetPatientsQuery({
     page: currentPage,
     per_page: perPage,
@@ -162,6 +165,33 @@ export default function PatientListPage() {
 
   const allSelected = filteredPatients.length > 0 && selectedPatientIds.length === filteredPatients.length;
   const someSelected = selectedPatientIds.length > 0 && selectedPatientIds.length < filteredPatients.length;
+
+  const handleDeleteClick = (patient: any) => {
+    setPatientToDelete(patient);
+    openDeleteModal();
+  };
+
+  const handleDeletePatient = async () => {
+    if (!patientToDelete) return;
+
+    try {
+      await deletePatient(patientToDelete.id).unwrap();
+      notifications.show({
+        title: "Success",
+        message: "Patient deleted successfully",
+        color: "green",
+      });
+      closeDeleteModal();
+      setPatientToDelete(null);
+      refetch();
+    } catch (error: any) {
+      notifications.show({
+        title: "Error",
+        message: error?.data?.detail || error?.data?.message || "Failed to delete patient",
+        color: "red",
+      });
+    }
+  };
 
   const handleSubmit = async (values: typeof form.values) => {
     try {
@@ -416,18 +446,10 @@ export default function PatientListPage() {
                         </Group>
                       </Table.Td>
                       <Table.Td>
-                        <Stack gap={4}>
-                          <Group gap={6}>
-                            <Phone size={14} className="text-gray-400" />
-                            <Text size="xs">{patient.profile?.phone_number || "N/A"}</Text>
-                          </Group>
-                          {patient.profile?.user?.email && (
-                            <Group gap={6}>
-                              <Mail size={14} className="text-gray-400" />
-                              <Text size="xs">{patient.profile.user.email}</Text>
-                            </Group>
-                          )}
-                        </Stack>
+                        <Group gap={6}>
+                          <Phone size={14} className="text-gray-400" />
+                          <Text size="xs">{patient.profile?.phone_number || "N/A"}</Text>
+                        </Group>
                       </Table.Td>
                       <Table.Td>
                         <Text size="sm">
@@ -473,14 +495,14 @@ export default function PatientListPage() {
                               <Menu.Item leftSection={<Calendar size={16} />}>
                                 Book Appointment
                               </Menu.Item>
-                              <Menu.Item leftSection={<Phone size={16} />}>
-                                Call Patient
-                              </Menu.Item>
-                              <Menu.Item leftSection={<Mail size={16} />}>
-                                Send Email
-                              </Menu.Item>
+
                               <Menu.Divider />
-                              <Menu.Item leftSection={<Trash2 size={16} />} color="red">
+                              <Menu.Item
+                                leftSection={<Trash2 size={16} />}
+                                color="red"
+                                onClick={() => handleDeleteClick(patient)}
+                                disabled={isDeleting}
+                              >
                                 Delete
                               </Menu.Item>
                             </Menu.Dropdown>
@@ -781,6 +803,63 @@ export default function PatientListPage() {
             </Stack>
           );
         })()}
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        opened={deleteModalOpened}
+        onClose={closeDeleteModal}
+        title={
+          <Group gap="xs">
+            <Trash2 size={20} className="text-red-600" />
+            <Text fw={600} size="lg" c="red">
+              Delete Patient
+            </Text>
+          </Group>
+        }
+        size="md"
+        centered
+      >
+        {patientToDelete && (
+          <Stack gap="md">
+            <Text size="sm" c="dimmed">
+              Are you sure you want to delete this patient? This action cannot be undone.
+            </Text>
+            <Card className="bg-red-50 border border-red-200" p="md">
+              <Group gap="xs">
+                <Avatar src={patientToDelete.profile_picture} size={40} radius="xl" />
+                <div>
+                  <Text size="sm" fw={600}>
+                    {patientToDelete.profile?.user?.first_name || ""} {patientToDelete.profile?.user?.last_name || ""}
+                  </Text>
+                  <Text size="xs" c="dimmed">
+                    Patient ID: #{patientToDelete.id}
+                  </Text>
+                </div>
+              </Group>
+            </Card>
+            <Group justify="flex-end" mt="md">
+              <Button
+                variant="light"
+                onClick={() => {
+                  closeDeleteModal();
+                  setPatientToDelete(null);
+                }}
+                disabled={isDeleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                color="red"
+                onClick={handleDeletePatient}
+                loading={isDeleting}
+                leftSection={<Trash2 size={16} />}
+              >
+                Delete Patient
+              </Button>
+            </Group>
+          </Stack>
+        )}
       </Modal>
     </Box>
   );

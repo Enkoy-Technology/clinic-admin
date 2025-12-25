@@ -114,6 +114,13 @@ export const patientsApi = createApi({
       query: (id) => `/patients/${id}/`,
       providesTags: ["Patients"],
     }),
+    deletePatient: builder.mutation<void, number>({
+      query: (id) => ({
+        url: `/patients/${id}/`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["Patients"],
+    }),
   }),
 });
 
@@ -122,5 +129,6 @@ export const {
   useUpdatePatientMutation,
   useGetPatientsQuery,
   useGetPatientQuery,
+  useDeletePatientMutation,
 } = patientsApi;
 
