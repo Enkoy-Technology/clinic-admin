@@ -59,6 +59,7 @@ export default function PatientListPage() {
   const [opened, { open, close }] = useDisclosure(false);
   const [viewModalOpened, { open: openView, close: closeView }] = useDisclosure(false);
   const [deleteModalOpened, { open: openDeleteModal, close: closeDeleteModal }] = useDisclosure(false);
+  const [bulkDeleteModalOpened, { open: openBulkDeleteModal, close: closeBulkDeleteModal }] = useDisclosure(false);
   const [patientToDelete, setPatientToDelete] = useState<any>(null);
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -307,6 +308,104 @@ export default function PatientListPage() {
     }
   };
 
+  const handleBulkDelete = async () => {
+    if (selectedPatientIds.length === 0) return;
+
+    try {
+      // Delete all selected patients
+      await Promise.all(selectedPatientIds.map((id) => deletePatient(id).unwrap()));
+      notifications.show({
+        title: "Success",
+        message: `${selectedPatientIds.length} patient(s) deleted successfully`,
+        color: "green",
+      });
+      closeBulkDeleteModal();
+      setSelectedPatientIds([]);
+      refetch();
+    } catch (error: any) {
+      notifications.show({
+        title: "Error",
+        message: error?.data?.detail || error?.data?.message || "Failed to delete patients",
+        color: "red",
+      });
+    }
+  };
+
+  const handleBulkExport = () => {
+    const selectedPatientsData = patients.filter((p) => selectedPatientIds.includes(p.id));
+
+    if (selectedPatientsData.length === 0) {
+      notifications.show({
+        title: "Error",
+        message: "No patients selected",
+        color: "red",
+      });
+      return;
+    }
+
+    // Prepare data for Excel
+    const excelData = selectedPatientsData.map((patient: any) => {
+      const fullName = `${patient.profile?.user?.first_name || ""} ${patient.profile?.user?.last_name || ""}`.trim() || patient.name || "N/A";
+      const address = patient.address
+        ? [patient.address.street, patient.address.city, patient.address.state].filter(Boolean).join(", ")
+        : "N/A";
+
+      return {
+        "Patient ID": patient.id,
+        "First Name": patient.profile?.user?.first_name || "",
+        "Last Name": patient.profile?.user?.last_name || "",
+        "Full Name": fullName,
+        "Phone Number": patient.profile?.phone_number || "",
+        "Email": patient.profile?.user?.email || "",
+        "Age": patient.age || "",
+        "Gender": patient.gender || "",
+        "Date of Birth": patient.dob || "",
+        "Status": patient.status || "",
+        "Street": patient.address?.street || "",
+        "City": patient.address?.city || "",
+        "State": patient.address?.state || "",
+        "Address": address,
+        "Note": patient.note || "",
+        "Created At": patient.created_at || "",
+        "Updated At": patient.updated_at || "",
+      };
+    });
+
+    // Convert to CSV format
+    const headers = Object.keys(excelData[0] || {});
+    const csvContent = [
+      headers.join(","),
+      ...excelData.map((row: any) =>
+        headers
+          .map((header) => {
+            const value = row[header] || "";
+            if (typeof value === "string" && (value.includes(",") || value.includes('"') || value.includes("\n"))) {
+              return `"${value.replace(/"/g, '""')}"`;
+            }
+            return value;
+          })
+          .join(",")
+      ),
+    ].join("\n");
+
+    // Create blob and download
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `selected_patients_export_${new Date().toISOString().split("T")[0]}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    notifications.show({
+      title: "Success",
+      message: `Exported ${selectedPatientsData.length} selected patient(s) to Excel`,
+      color: "green",
+    });
+  };
+
   const handleSubmit = async (values: typeof form.values) => {
     try {
       // Format date of birth (optional if age is provided)
@@ -505,8 +604,47 @@ export default function PatientListPage() {
                 clearable
                 w={150}
               />
+        </Group>
+      </Card>
+
+      {/* Bulk Actions Bar */}
+      {selectedPatientIds.length > 0 && (
+        <Card shadow="sm" p="md" mb="md" className="border border-[#19b5af] bg-[#19b5af]/5">
+          <Group justify="space-between">
+            <Group gap="md">
+              <Text size="sm" fw={600}>
+                {selectedPatientIds.length} patient(s) selected
+              </Text>
+              <Button
+                variant="light"
+                size="sm"
+                onClick={() => setSelectedPatientIds([])}
+              >
+                Clear Selection
+              </Button>
             </Group>
-          </Card>
+            <Group gap="xs">
+              <Button
+                variant="light"
+                size="sm"
+                leftSection={<Download size={16} />}
+                onClick={handleBulkExport}
+              >
+                Export Selected
+              </Button>
+              <Button
+                variant="light"
+                color="red"
+                size="sm"
+                leftSection={<Trash2 size={16} />}
+                onClick={openBulkDeleteModal}
+              >
+                Delete Selected
+              </Button>
+            </Group>
+          </Group>
+        </Card>
+      )}
 
           {/* Patients Table */}
           <Card shadow="sm" p="lg" className="border border-gray-200">
@@ -980,6 +1118,53 @@ export default function PatientListPage() {
             </Group>
           </Stack>
         )}
+      </Modal>
+
+      {/* Bulk Delete Confirmation Modal */}
+      <Modal
+        opened={bulkDeleteModalOpened}
+        onClose={closeBulkDeleteModal}
+        title={
+          <Group gap="xs">
+            <Trash2 size={20} className="text-red-600" />
+            <Text fw={600} size="lg" c="red">
+              Delete Selected Patients
+            </Text>
+          </Group>
+        }
+        size="md"
+        centered
+      >
+        <Stack gap="md">
+          <Text size="sm" c="dimmed">
+            Are you sure you want to delete {selectedPatientIds.length} patient(s)? This action cannot be undone.
+          </Text>
+          <Card className="bg-red-50 border border-red-200" p="md">
+            <Text size="sm" fw={600} c="red" mb={4}>
+              Warning: This will permanently delete the selected patients.
+            </Text>
+            <Text size="xs" c="dimmed">
+              Selected Patient IDs: {selectedPatientIds.join(", ")}
+            </Text>
+          </Card>
+          <Group justify="flex-end" mt="md">
+            <Button
+              variant="light"
+              onClick={closeBulkDeleteModal}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              color="red"
+              onClick={handleBulkDelete}
+              loading={isDeleting}
+              leftSection={<Trash2 size={16} />}
+            >
+              Delete {selectedPatientIds.length} Patient(s)
+            </Button>
+          </Group>
+        </Stack>
       </Modal>
     </Box>
   );
