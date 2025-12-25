@@ -15,7 +15,7 @@ export interface CreatePatientRequest {
   age?: number;
   dob?: string; // YYYY-MM-DD (optional if age is provided)
   gender: "MALE" | "FEMALE";
-  status?: "ACTIVE" | "INACTIVE";
+  status?: "ACTIVE" | "COMPLETED" | "PENDING" | "ARCHIVED";
   note?: string;
   address?: {
     city?: string;
@@ -42,7 +42,7 @@ export interface Patient {
   age?: number;
   dob?: string;
   gender: "MALE" | "FEMALE";
-  status?: "ACTIVE" | "INACTIVE";
+  status?: "ACTIVE" | "COMPLETED" | "PENDING" | "ARCHIVED";
   telegram_username?: string;
   note?: string;
   address?: {

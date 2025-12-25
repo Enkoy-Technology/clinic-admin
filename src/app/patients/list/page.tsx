@@ -46,9 +46,13 @@ import { useCreatePatientMutation, useDeletePatientMutation, useGetPatientsQuery
 
 const statusColors: Record<string, string> = {
   ACTIVE: "green",
-  INACTIVE: "gray",
+  COMPLETED: "blue",
+  PENDING: "yellow",
+  ARCHIVED: "gray",
   active: "green",
-  inactive: "gray",
+  completed: "blue",
+  pending: "yellow",
+  archived: "gray",
 };
 
 export default function PatientListPage() {
@@ -82,7 +86,7 @@ export default function PatientListPage() {
       gender: "MALE" as "MALE" | "FEMALE",
       age: undefined as number | undefined,
       dob: null as Date | null,
-      status: "ACTIVE" as "ACTIVE" | "INACTIVE",
+      status: "ACTIVE" as "ACTIVE" | "COMPLETED" | "PENDING" | "ARCHIVED",
       note: "",
       // Address fields
       street: "",
@@ -112,7 +116,9 @@ export default function PatientListPage() {
     const patientStatus = patient.status?.toUpperCase();
     const matchesStatus = statusFilter === "all" ||
       (statusFilter === "active" && patientStatus === "ACTIVE") ||
-      (statusFilter === "inactive" && patientStatus === "INACTIVE");
+      (statusFilter === "completed" && patientStatus === "COMPLETED") ||
+      (statusFilter === "pending" && patientStatus === "PENDING") ||
+      (statusFilter === "archived" && patientStatus === "ARCHIVED");
     const matchesGender = genderFilter === "all" ||
       (genderFilter === "Male" && patient.gender === "MALE") ||
       (genderFilter === "Female" && patient.gender === "FEMALE");
@@ -443,16 +449,17 @@ export default function PatientListPage() {
       ) : (
         <>
           {/* Stats Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6 w-full">
             {[
               { label: "Total Patients", value: (patientsData?.count || 0).toString(), color: "bg-blue-500" },
               { label: "Active", value: patients.filter(p => p.status?.toUpperCase() === "ACTIVE").length.toString(), color: "bg-green-500" },
-              { label: "Male", value: patients.filter(p => p.gender === "MALE").length.toString(), color: "bg-purple-500" },
-              { label: "Female", value: patients.filter(p => p.gender === "FEMALE").length.toString(), color: "bg-pink-500" },
+              { label: "Completed", value: patients.filter(p => p.status?.toUpperCase() === "COMPLETED").length.toString(), color: "bg-blue-500" },
+              { label: "Pending", value: patients.filter(p => p.status?.toUpperCase() === "PENDING").length.toString(), color: "bg-yellow-500" },
+              { label: "Archived", value: patients.filter(p => p.status?.toUpperCase() === "ARCHIVED").length.toString(), color: "bg-gray-500" },
             ].map((stat, index) => (
-              <Card key={index} shadow="sm" p="md" className="border border-gray-200">
+              <Card key={index} shadow="sm" p="md" className="border border-gray-200 w-full">
                 <Group justify="space-between">
-                  <div>
+                  <div className="flex-1">
                     <Text size="sm" c="dimmed" mb={4}>{stat.label}</Text>
                     <Text size="xl" fw={700}>{stat.value}</Text>
                   </div>
@@ -472,18 +479,20 @@ export default function PatientListPage() {
                 onChange={(e) => setSearchQuery(e.currentTarget.value)}
                 className="flex-1"
               />
-              <Select
-                placeholder="Status"
-                data={[
-                  { value: "all", label: "All Status" },
-                  { value: "active", label: "Active" },
-                  { value: "inactive", label: "Inactive" },
-                ]}
-                value={statusFilter}
-                onChange={setStatusFilter}
-                clearable
-                w={150}
-              />
+          <Select
+            placeholder="Status"
+            data={[
+              { value: "all", label: "All Status" },
+              { value: "active", label: "Active" },
+              { value: "completed", label: "Completed" },
+              { value: "pending", label: "Pending" },
+              { value: "archived", label: "Archived" },
+            ]}
+            value={statusFilter}
+            onChange={setStatusFilter}
+            clearable
+            w={150}
+          />
               <Select
                 placeholder="Gender"
                 data={[
@@ -750,7 +759,9 @@ export default function PatientListPage() {
                     placeholder="Select status"
                     data={[
                       { value: "ACTIVE", label: "Active" },
-                      { value: "INACTIVE", label: "Inactive" },
+                      { value: "COMPLETED", label: "Completed" },
+                      { value: "PENDING", label: "Pending" },
+                      { value: "ARCHIVED", label: "Archived" },
                     ]}
                     {...form.getInputProps("status")}
                   />
