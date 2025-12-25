@@ -171,6 +171,114 @@ export default function PatientListPage() {
     openDeleteModal();
   };
 
+  const handleExportToExcel = async () => {
+    try {
+      notifications.show({
+        title: "Exporting",
+        message: "Preparing patient data for export...",
+        color: "blue",
+        loading: true,
+        autoClose: false,
+      });
+
+      // Fetch all patients by getting all pages
+      let allPatients: any[] = [];
+      let currentPageNum = 1;
+      let hasMore = true;
+
+      while (hasMore) {
+        const response = await fetch(`https://ff-gng8.onrender.com/api/patients/?page=${currentPageNum}&per_page=100`, {
+          headers: {
+            Authorization: `JWT ${localStorage.getItem("accessToken")}`,
+            accept: "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch patients");
+        }
+
+        const data = await response.json();
+        allPatients = [...allPatients, ...(data.results || [])];
+
+        if (data.links?.next && currentPageNum < data.total_pages) {
+          currentPageNum++;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      // Prepare data for Excel
+      const excelData = allPatients.map((patient: any) => {
+        const fullName = `${patient.profile?.user?.first_name || ""} ${patient.profile?.user?.last_name || ""}`.trim() || patient.name || "N/A";
+        const address = patient.address
+          ? [patient.address.street, patient.address.city, patient.address.state].filter(Boolean).join(", ")
+          : "N/A";
+
+        return {
+          "Patient ID": patient.id,
+          "First Name": patient.profile?.user?.first_name || "",
+          "Last Name": patient.profile?.user?.last_name || "",
+          "Full Name": fullName,
+          "Phone Number": patient.profile?.phone_number || "",
+          "Email": patient.profile?.user?.email || "",
+          "Age": patient.age || "",
+          "Gender": patient.gender || "",
+          "Date of Birth": patient.dob || "",
+          "Status": patient.status || "",
+          "Street": patient.address?.street || "",
+          "City": patient.address?.city || "",
+          "State": patient.address?.state || "",
+          "Address": address,
+          "Note": patient.note || "",
+          "Created At": patient.created_at || "",
+          "Updated At": patient.updated_at || "",
+        };
+      });
+
+      // Convert to CSV format
+      const headers = Object.keys(excelData[0] || {});
+      const csvContent = [
+        headers.join(","),
+        ...excelData.map((row: any) =>
+          headers
+            .map((header) => {
+              const value = row[header] || "";
+              // Escape commas and quotes in CSV
+              if (typeof value === "string" && (value.includes(",") || value.includes('"') || value.includes("\n"))) {
+                return `"${value.replace(/"/g, '""')}"`;
+              }
+              return value;
+            })
+            .join(",")
+        ),
+      ].join("\n");
+
+      // Create blob and download
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", `patients_export_${new Date().toISOString().split("T")[0]}.csv`);
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      notifications.show({
+        title: "Success",
+        message: `Exported ${allPatients.length} patients to Excel`,
+        color: "green",
+      });
+    } catch (error: any) {
+      notifications.show({
+        title: "Error",
+        message: error?.message || "Failed to export patients",
+        color: "red",
+      });
+    }
+  };
+
   const handleDeletePatient = async () => {
     if (!patientToDelete) return;
 
@@ -309,6 +417,7 @@ export default function PatientListPage() {
           <Button
             leftSection={<Download size={18} />}
             variant="light"
+            onClick={handleExportToExcel}
           >
             Export
           </Button>
