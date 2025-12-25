@@ -18,7 +18,28 @@ const baseQuery = fetchBaseQuery({
   },
 });
 
-// Wrapper that automatically refreshes token on 401
+// Helper function to check if error is token expired
+const isTokenExpiredError = (error: any): boolean => {
+  if (!error || !error.data) return false;
+
+  const errorData = error.data as any;
+
+  // Check for the specific token expired error structure
+  if (
+    errorData.code === "token_not_valid" &&
+    errorData.detail === "Given token not valid for any token type"
+  ) {
+    const messages = errorData.messages || [];
+    return messages.some(
+      (msg: any) =>
+        msg.token_type === "access" && msg.message === "Token is expired"
+    );
+  }
+
+  return false;
+};
+
+// Wrapper that automatically refreshes token on 401 or 403 with token expired error
 export const baseQueryWithReauth: BaseQueryFn<
   string | FetchArgs,
   unknown,
@@ -26,7 +47,11 @@ export const baseQueryWithReauth: BaseQueryFn<
 > = async (args, api, extraOptions) => {
   let result = await baseQuery(args, api, extraOptions);
 
-  if (result.error && result.error.status === 401) {
+  // Check for 401 or 403 with token expired error
+  const isUnauthorized = result.error && (result.error.status === 401 || result.error.status === 403);
+  const isTokenExpired = isUnauthorized && isTokenExpiredError(result.error);
+
+  if (isTokenExpired) {
     // Try to refresh the token
     const refreshToken = localStorage.getItem("refreshToken");
     if (refreshToken) {
@@ -41,14 +66,26 @@ export const baseQueryWithReauth: BaseQueryFn<
       );
 
       if (refreshResult.data) {
-        const { token } = refreshResult.data as { token: string };
+        // Handle different response formats from refresh endpoint
+        const refreshData = refreshResult.data as any;
+        const newToken = refreshData.token || refreshData.access || refreshData.access_token;
 
-        // Update the token in both localStorage and Redux
-        localStorage.setItem("accessToken", token);
-        api.dispatch(updateAccessToken(token));
+        if (newToken) {
+          // Update the token in both localStorage and Redux
+          localStorage.setItem("accessToken", newToken);
+          api.dispatch(updateAccessToken(newToken));
 
-        // Retry the original query with the new token
-        result = await baseQuery(args, api, extraOptions);
+          // Retry the original query with the new token
+          result = await baseQuery(args, api, extraOptions);
+        } else {
+          // Token format not recognized, logout user
+          localStorage.removeItem("accessToken");
+          localStorage.removeItem("refreshToken");
+          localStorage.removeItem("user");
+          if (typeof window !== "undefined") {
+            window.location.href = "/login";
+          }
+        }
       } else {
         // Refresh failed, logout user
         localStorage.removeItem("accessToken");

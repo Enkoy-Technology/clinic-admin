@@ -25,14 +25,16 @@ import {
 } from "../../shared/api/messagesApi";
 
 export default function NotificationsPage() {
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [readFilter, setReadFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [viewModalOpened, { open: openView, close: closeView }] = useDisclosure(false);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
 
-  // Get all messages (both read and unread)
-  const { data: messagesData, isLoading, error } = useGetMessagesQuery({});
+  // Get all messages (both read and unread) with pagination
+  const { data: messagesData, isLoading, error } = useGetMessagesQuery({
+    page: 1,
+    page_size: 100, // Get a reasonable number of messages
+  });
   const [markAsRead, { isLoading: isMarkingRead }] = useMarkAsReadMutation();
 
   const messages = messagesData?.results ?? [];
@@ -45,7 +47,6 @@ export default function NotificationsPage() {
       message.message.toLowerCase().includes(searchQuery.toLowerCase());
 
     if (!matchesSearch) return false;
-    if (statusFilter && message.status !== statusFilter) return false;
     if (readFilter === "read" && !message.is_read) return false;
     if (readFilter === "unread" && message.is_read) return false;
     return true;
@@ -60,15 +61,9 @@ export default function NotificationsPage() {
       try {
         await markAsRead(message.id).unwrap();
       } catch (error) {
-        console.error("Failed to mark message as read:", error);
+        // Silently handle error - user can retry if needed
       }
     }
-  };
-
-  const statusColors: Record<string, string> = {
-    PENDING: "yellow",
-    RESOLVED: "green",
-    ARCHIVED: "gray",
   };
 
   if (isLoading) {
@@ -94,7 +89,6 @@ export default function NotificationsPage() {
   }
 
   const unreadCount = messages.filter((m) => !m.is_read).length;
-  const pendingCount = messages.filter((m) => m.status === "PENDING").length;
 
   return (
     <Box>
@@ -111,7 +105,7 @@ export default function NotificationsPage() {
       </Group>
 
       {/* Stats Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         {[
           {
             label: "Total Messages",
@@ -122,11 +116,6 @@ export default function NotificationsPage() {
             label: "Unread",
             value: unreadCount.toString(),
             color: "bg-red-500",
-          },
-          {
-            label: "Pending",
-            value: pendingCount.toString(),
-            color: "bg-yellow-500",
           },
         ].map((stat, index) => (
           <Card key={index} shadow="sm" p="md" className="border border-gray-200">
@@ -156,18 +145,6 @@ export default function NotificationsPage() {
             className="flex-1"
           />
           <Select
-            placeholder="Status"
-            data={[
-              { value: "PENDING", label: "Pending" },
-              { value: "RESOLVED", label: "Resolved" },
-              { value: "ARCHIVED", label: "Archived" },
-            ]}
-            value={statusFilter}
-            onChange={setStatusFilter}
-            clearable
-            w={150}
-          />
-          <Select
             placeholder="Read Status"
             data={[
               { value: "unread", label: "Unread" },
@@ -190,7 +167,6 @@ export default function NotificationsPage() {
               <Table.Th>Name</Table.Th>
               <Table.Th>Phone Number</Table.Th>
               <Table.Th>Message</Table.Th>
-              <Table.Th>Status</Table.Th>
               <Table.Th>Read Status</Table.Th>
               <Table.Th>Date</Table.Th>
               <Table.Th>Actions</Table.Th>
@@ -199,7 +175,7 @@ export default function NotificationsPage() {
           <Table.Tbody>
             {filteredMessages.length === 0 ? (
               <Table.Tr>
-                <Table.Td colSpan={8}>
+                <Table.Td colSpan={7}>
                   <Text ta="center" py="xl" c="dimmed">
                     No messages found
                   </Text>
@@ -233,15 +209,6 @@ export default function NotificationsPage() {
                     <Text size="sm" lineClamp={2} style={{ maxWidth: "400px" }}>
                       {message.message}
                     </Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Badge
-                      variant="light"
-                      color={statusColors[message.status] || "gray"}
-                      size="sm"
-                    >
-                      {message.status}
-                    </Badge>
                   </Table.Td>
                   <Table.Td>
                     <Badge
@@ -293,24 +260,13 @@ export default function NotificationsPage() {
               <Badge variant="light" color="gray">
                 ID: {selectedMessage.id}
               </Badge>
-              <Group gap="xs">
-                <Badge
-                  variant="light"
-                  color={
-                    statusColors[selectedMessage.status] || "gray"
-                  }
-                  size="sm"
-                >
-                  {selectedMessage.status}
-                </Badge>
-                <Badge
-                  variant="light"
-                  color={selectedMessage.is_read ? "green" : "red"}
-                  size="sm"
-                >
-                  {selectedMessage.is_read ? "Read" : "Unread"}
-                </Badge>
-              </Group>
+              <Badge
+                variant="light"
+                color={selectedMessage.is_read ? "green" : "red"}
+                size="sm"
+              >
+                {selectedMessage.is_read ? "Read" : "Unread"}
+              </Badge>
             </Group>
 
             <div>

@@ -94,10 +94,14 @@ const ProtectedLayout = ({
   });
 
   // Only fetch messages after initial render to avoid blocking
+  // Fetch only 2 unread messages for the notification dropdown (page 0, page_size 2)
   const [shouldFetchMessages, setShouldFetchMessages] = useState(false);
-  const { data: messagesData } = useGetUnreadMessagesQuery(undefined, {
-    skip: !shouldFetchMessages,
-  });
+  const { data: messagesData } = useGetUnreadMessagesQuery(
+    { page: 0, page_size: 2 },
+    {
+      skip: !shouldFetchMessages,
+    }
+  );
 
   // Delay messages fetch to not block initial render
   useEffect(() => {

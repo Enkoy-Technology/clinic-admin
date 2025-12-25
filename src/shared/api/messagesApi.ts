@@ -33,13 +33,26 @@ export const messagesApi = createApi({
   baseQuery: baseQueryWithReauth,
   tagTypes: ["Messages"],
   endpoints: (builder) => ({
-    getUnreadMessages: builder.query<MessagesResponse, void>({
-      query: () => {
+    getUnreadMessages: builder.query<MessagesResponse, { page?: number; page_size?: number } | void>({
+      query: (params) => {
         const url = `/messages/`;
-        const params = { is_read: "false" };
+        const queryParams: Record<string, string> = {
+          is_read: "false",
+        };
+
+        // Add pagination if provided
+        if (params) {
+          if (params.page !== undefined) {
+            queryParams.page = params.page.toString();
+          }
+          if (params.page_size !== undefined) {
+            queryParams.page_size = params.page_size.toString();
+          }
+        }
+
         return {
           url,
-          params,
+          params: queryParams,
         };
       },
       transformResponse: (response: MessagesApiResponse): MessagesResponse => {
@@ -55,11 +68,25 @@ export const messagesApi = createApi({
       },
       providesTags: ["Messages"],
     }),
-    getMessages: builder.query<MessagesResponse, { is_read?: boolean; page?: number }>({
-      query: (params) => ({
-        url: `/messages/`,
-        params: params.is_read !== undefined ? { is_read: params.is_read.toString() } : {},
-      }),
+    getMessages: builder.query<MessagesResponse, { is_read?: boolean | string; page?: number; page_size?: number }>({
+      query: (params = {}) => {
+        const queryParams: Record<string, string> = {};
+
+        if (params.is_read !== undefined) {
+          queryParams.is_read = params.is_read.toString();
+        }
+        if (params.page !== undefined) {
+          queryParams.page = params.page.toString();
+        }
+        if (params.page_size !== undefined) {
+          queryParams.page_size = params.page_size.toString();
+        }
+
+        return {
+          url: `/messages/`,
+          params: queryParams,
+        };
+      },
       transformResponse: (response: MessagesApiResponse): MessagesResponse => {
         // Handle array response
         if (Array.isArray(response)) {
@@ -75,6 +102,13 @@ export const messagesApi = createApi({
     }),
     markAsRead: builder.mutation<Message, number>({
       query: (id) => ({
+        url: `/messages/${id}/mark-read/`,
+        method: "POST",
+      }),
+      invalidatesTags: ["Messages"],
+    }),
+    markAsUnread: builder.mutation<Message, number>({
+      query: (id) => ({
         url: `/messages/${id}/mark-unread/`,
         method: "POST",
       }),
@@ -87,5 +121,6 @@ export const {
   useGetUnreadMessagesQuery,
   useGetMessagesQuery,
   useMarkAsReadMutation,
+  useMarkAsUnreadMutation,
 } = messagesApi;
 
