@@ -1,36 +1,37 @@
 "use client";
 
 import {
-    ActionIcon,
-    AppShell,
-    Avatar,
-    Box,
-    Group,
-    Indicator,
-    Menu,
-    ScrollArea,
-    Text,
-    UnstyledButton,
+  ActionIcon,
+  AppShell,
+  Avatar,
+  Box,
+  Group,
+  Indicator,
+  Menu,
+  ScrollArea,
+  Text,
+  UnstyledButton,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import {
-    IconBell,
-    IconChevronDown,
-    IconLogout,
-    IconMenu2 as IconMenu,
-    IconSettings,
-    IconUser,
+  IconBell,
+  IconChevronDown,
+  IconLogout,
+  IconMenu2 as IconMenu,
+  IconSettings,
+  IconUser,
 } from "@tabler/icons-react";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useGetCurrentUserQuery } from "../../../shared/api/authApi";
+import { useGetUnreadMessagesQuery } from "../../../shared/api/messagesApi";
 import AuthGuard from "../../../shared/components/AuthGuard";
 import {
-    logout,
-    selectCurrentUser,
-    setUser,
+  logout,
+  selectCurrentUser,
+  setUser,
 } from "../../../shared/slices/authSlice";
 import ClientNavWrapper from "../clientNavWrapper/clientNavWrapper";
 import menuItems from "../dashboard/menu_items";
@@ -92,6 +93,19 @@ const ProtectedLayout = ({
     skip: !!userFromRedux,
   });
 
+  const { data: messagesData, error: messagesError, isLoading: messagesLoading } = useGetUnreadMessagesQuery();
+
+  // Log messages API state
+  useEffect(() => {
+    console.log("[Layout] Messages API State:", {
+      loading: messagesLoading,
+      hasData: !!messagesData,
+      data: messagesData,
+      error: messagesError,
+      count: messagesData?.count,
+    });
+  }, [messagesData, messagesError, messagesLoading]);
+
   // Update user in Redux when fetched from API
   useEffect(() => {
     if (userData && !userFromRedux) {
@@ -100,6 +114,7 @@ const ProtectedLayout = ({
   }, [userData, userFromRedux, dispatch]);
 
   const displayUser = userFromRedux || userData;
+  const unreadCount = messagesData?.count || 0;
   const profileImageUrl = displayUser?.profile_picture?.startsWith("/media/")
     ? `https://ff-gng8.onrender.com${displayUser.profile_picture}`
     : displayUser?.profile_picture;
@@ -159,7 +174,7 @@ const ProtectedLayout = ({
               {/* Right: Quick Actions */}
               <Group gap="sm">
                 {/* Notifications */}
-                <Menu shadow="md" width={280}>
+                <Menu shadow="md" width={320}>
                   <Menu.Target>
                     <ActionIcon
                       variant="subtle"
@@ -168,9 +183,10 @@ const ProtectedLayout = ({
                     >
                       <Indicator
                         inline
-                        size={8}
+                        size={unreadCount > 0 ? 20 : 8}
                         color="red"
-                        processing
+                        processing={unreadCount === 0}
+                        label={unreadCount > 0 ? unreadCount : undefined}
                         offset={5}
                         position="top-end"
                       >
@@ -180,31 +196,50 @@ const ProtectedLayout = ({
                   </Menu.Target>
 
                   <Menu.Dropdown>
-                    <Menu.Label>Notifications</Menu.Label>
-                    <Menu.Item>
-                      <div>
-                        <Text size="sm" fw={500}>
-                          New appointment
+                    <Menu.Label>
+                      Notifications
+                      {unreadCount > 0 && (
+                        <Text size="xs" c="dimmed" component="span" ml="xs">
+                          ({unreadCount} unread)
                         </Text>
-                        <Text size="xs" c="dimmed">
-                          Abebe Kebede booked for 2:00 PM
+                      )}
+                    </Menu.Label>
+                    {messagesData?.results && messagesData.results.length > 0 ? (
+                      <>
+                        {messagesData.results.slice(0, 5).map((message) => (
+                          <Menu.Item key={message.id}>
+                            <div>
+                              <Text size="sm" fw={500}>
+                                {message.name}
+                              </Text>
+                              <Text size="xs" c="dimmed" lineClamp={2}>
+                                {message.message}
+                              </Text>
+                              <Text size="xs" c="dimmed" mt={4}>
+                                {new Date(message.created_at).toLocaleDateString()}
+                              </Text>
+                            </div>
+                          </Menu.Item>
+                        ))}
+                        {messagesData.results.length > 5 && (
+                          <>
+                            <Menu.Divider />
+                            <Menu.Item
+                              className="text-center text-[#19b5af]"
+                              onClick={() => router.push("/notifications")}
+                            >
+                              View all ({messagesData.count} messages)
+                            </Menu.Item>
+                          </>
+                        )}
+                      </>
+                    ) : (
+                      <Menu.Item disabled>
+                        <Text size="sm" c="dimmed">
+                          No unread messages
                         </Text>
-                      </div>
-                    </Menu.Item>
-                    <Menu.Item>
-                      <div>
-                        <Text size="sm" fw={500}>
-                          Payment received
-                        </Text>
-                        <Text size="xs" c="dimmed">
-                          ETB 2,500 from Tigist Alemu
-                        </Text>
-                      </div>
-                    </Menu.Item>
-                    <Menu.Divider />
-                    <Menu.Item className="text-center text-[#19b5af]">
-                      View all
-                    </Menu.Item>
+                      </Menu.Item>
+                    )}
                   </Menu.Dropdown>
                 </Menu>
 

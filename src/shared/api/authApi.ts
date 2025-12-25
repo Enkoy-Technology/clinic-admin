@@ -1,7 +1,81 @@
+import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import { updateAccessToken } from "../slices/authSlice";
 
-// Use Next.js API proxy to avoid CORS issues
-const API_BASE_URL = "/api";
+const API_BASE_URL = "https://ff-gng8.onrender.com/api";
+
+// Base query function that handles token refresh on 401 errors
+const baseQuery = fetchBaseQuery({
+  baseUrl: API_BASE_URL,
+  prepareHeaders: (headers) => {
+    const token = localStorage.getItem("accessToken");
+    if (token) {
+      const cleanToken = token.replace(/^(Bearer|JWT)\s+/i, "");
+      headers.set("Authorization", `JWT ${cleanToken}`);
+    }
+    headers.set("accept", "*/*");
+    headers.set("Content-Type", "application/json");
+    return headers;
+  },
+});
+
+// Wrapper that automatically refreshes token on 401
+export const baseQueryWithReauth: BaseQueryFn<
+  string | FetchArgs,
+  unknown,
+  FetchBaseQueryError
+> = async (args, api, extraOptions) => {
+  let result = await baseQuery(args, api, extraOptions);
+
+  if (result.error && result.error.status === 401) {
+    console.log("[Auth] Token expired, attempting refresh...");
+
+    // Try to refresh the token
+    const refreshToken = localStorage.getItem("refreshToken");
+    if (refreshToken) {
+      const refreshResult = await baseQuery(
+        {
+          url: "/auth/refresh/",
+          method: "POST",
+          body: { refresh: refreshToken },
+        },
+        api,
+        extraOptions
+      );
+
+      if (refreshResult.data) {
+        const { token } = refreshResult.data as { token: string };
+
+        // Update the token in both localStorage and Redux
+        localStorage.setItem("accessToken", token);
+        api.dispatch(updateAccessToken(token));
+        console.log("[Auth] Token refreshed successfully");
+
+        // Retry the original query with the new token
+        result = await baseQuery(args, api, extraOptions);
+      } else {
+        // Refresh failed, logout user
+        console.error("[Auth] Token refresh failed, logging out");
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+        localStorage.removeItem("user");
+
+        // Optionally dispatch logout action
+        if (typeof window !== "undefined") {
+          window.location.href = "/login";
+        }
+      }
+    } else {
+      // No refresh token, redirect to login
+      console.error("[Auth] No refresh token found, redirecting to login");
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
+      }
+    }
+  }
+
+  return result;
+};
 
 export interface LoginCredentials {
   email: string;
@@ -61,23 +135,12 @@ export interface User {
 
 export const authApi = createApi({
   reducerPath: "authApi",
-  baseQuery: fetchBaseQuery({
-    baseUrl: API_BASE_URL,
-    prepareHeaders: (headers, { getState }) => {
-      // Get token from localStorage
-      const token = localStorage.getItem("accessToken");
-      if (token) {
-        headers.set("authorization", `Bearer ${token}`);
-      }
-      headers.set("Content-Type", "application/json");
-      return headers;
-    },
-  }),
+  baseQuery: baseQueryWithReauth,
   tagTypes: ["Auth"],
   endpoints: (builder) => ({
     login: builder.mutation<AuthResponse, LoginCredentials>({
       query: (credentials) => ({
-        url: "/auth/token",
+        url: "/auth/token/",
         method: "POST",
         body: credentials,
       }),
@@ -85,7 +148,7 @@ export const authApi = createApi({
     }),
     refreshToken: builder.mutation<{ token: string }, { refresh: string }>({
       query: (body) => ({
-        url: "/auth/token/refresh",
+        url: "/auth/refresh/",
         method: "POST",
         body,
       }),
