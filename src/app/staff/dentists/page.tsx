@@ -37,8 +37,7 @@ import {
   Plus,
   Search,
   Trash2,
-  User,
-  Users
+  User
 } from "lucide-react";
 import { useState } from "react";
 import { useCreateDoctorMutation, useGetDoctorsQuery, useUpdateDoctorMutation, type CreateDoctorRequest } from "../../../shared/api/doctorsApi";
@@ -243,8 +242,6 @@ export default function DentistsPage() {
     }
   };
 
-  const activeDentists = dentists.length; // All fetched dentists are considered active
-  const totalDoctors = doctorsData?.count || 0;
 
   return (
     <Box>
@@ -266,33 +263,6 @@ export default function DentistsPage() {
           Add Dentist
         </Button>
       </Group>
-
-      {/* Stats Cards */}
-      {isLoadingDoctors ? (
-        <div className="flex justify-center py-8">
-          <Loader size="lg" color="teal" />
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          {[
-            { label: "Total Dentists", value: totalDoctors.toString(), icon: Users, color: "bg-blue-500" },
-            { label: "Current Page", value: `${doctorsData?.current_page || 1} of ${doctorsData?.total_pages || 1}`, icon: User, color: "bg-green-500" },
-            { label: "Showing", value: `${dentists.length} of ${totalDoctors}`, icon: Users, color: "bg-purple-500" },
-          ].map((stat, index) => (
-            <Card key={index} shadow="sm" p="md" className="border border-gray-200">
-              <Group justify="space-between">
-                <div>
-                  <Text size="sm" c="dimmed" mb={4}>{stat.label}</Text>
-                  <Text size="xl" fw={700}>{stat.value}</Text>
-                </div>
-                <div className={`${stat.color} p-3 rounded-lg`}>
-                  <stat.icon size={24} className="text-white" />
-                </div>
-              </Group>
-            </Card>
-          ))}
-        </div>
-      )}
 
       {/* Filters */}
       <Card shadow="sm" p="md" mb="md" className="border border-gray-200">
