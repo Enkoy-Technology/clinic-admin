@@ -59,6 +59,27 @@ const convertTo12Hour = (time24: string) => {
   return `${hour12}:${minutes} ${ampm}`;
 };
 
+// Helper function to convert system time to Ethiopian Local Time (ET)
+// System time 8:30 AM = 2:30 AM ET (6 hours behind)
+const convertToEthiopianTime = (time24: string) => {
+  const [hours, minutes] = time24.split(":");
+  if (!hours || !minutes) return time24;
+
+  let hour = parseInt(hours);
+  hour = (hour - 6 + 24) % 24; // Subtract 6 hours to convert to ET
+
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const hour12 = hour % 12 || 12;
+  return `${hour12}:${minutes} ${ampm}`;
+};
+
+// Helper function to format time with ET in brackets
+const formatTimeWithET = (time24: string) => {
+  const time12 = convertTo12Hour(time24);
+  const timeET = convertToEthiopianTime(time24);
+  return `${time12} (${timeET} ET)`;
+};
+
 // Helper function to convert 12-hour to 24-hour format
 const convertTo24Hour = (time12: string) => {
   const match = time12.match(/(\d+):(\d+)\s*(AM|PM)/i);
@@ -206,23 +227,40 @@ export default function AppointmentsPage() {
     return grouped;
   }, [appointmentsData]);
 
-  // Booking handlers
-  const handleNewPatient = () => {
-    setAppointmentType("new");
+  // Booking handler - single button for both new and follow-up
+  const handleAddAppointment = () => {
     setBookingTab("new");
+    setAppointmentType(null);
+    setSelectedSlot(null);
     openBook();
   };
 
-  const handleFollowUp = () => {
-    setAppointmentType("followup");
-    setBookingTab("followup");
-    openBook();
+  // Validation: Check if date/time is in the past
+  const isPastDateTime = (date: Date, timeSlot: string): boolean => {
+    const time24 = convertTo24Hour(timeSlot);
+    const [hours, minutes] = time24.split(":");
+    const appointmentDateTime = new Date(date);
+    appointmentDateTime.setHours(parseInt(hours || "0"), parseInt(minutes || "0"), 0, 0);
+
+    const now = new Date();
+    now.setSeconds(0, 0); // Remove seconds and milliseconds for comparison
+
+    return appointmentDateTime < now;
+  };
+
+  // Check if a date is in the past
+  const isPastDate = (date: Date): boolean => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const compareDate = new Date(date);
+    compareDate.setHours(0, 0, 0, 0);
+    return compareDate < today;
   };
 
   const handleQuickSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (selectedSlot) {
+    if (selectedSlot && selectedDate) {
       try {
         // Convert 12-hour format to 24-hour format for API
         const time24 = convertTo24Hour(selectedSlot);
@@ -246,8 +284,9 @@ export default function AppointmentsPage() {
         refetch();
         closeBook();
         setAppointmentType(null);
+        setSelectedSlot(null);
       } catch (error) {
-        console.error("Failed to create appointment:", error);
+        // Silently handle error
       }
     }
   };
@@ -294,7 +333,14 @@ export default function AppointmentsPage() {
   const goToPreviousDay = () => {
     const newDate = new Date(selectedDate);
     newDate.setDate(newDate.getDate() - 1);
-    setSelectedDate(newDate);
+    // Don't allow going to past dates
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const compareDate = new Date(newDate);
+    compareDate.setHours(0, 0, 0, 0);
+    if (compareDate >= today) {
+      setSelectedDate(newDate);
+    }
   };
 
   const goToNextDay = () => {
@@ -415,38 +461,17 @@ export default function AppointmentsPage() {
         </Group>
       </Group>
 
-      {/* Quick Action Buttons */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      {/* Quick Action Button */}
+      <div className="mb-6">
         <Button
           size="xl"
-          className="h-20 bg-gradient-to-r from-[#19b5af] to-[#14918c] hover:opacity-90"
+          className="h-16 w-full md:w-auto bg-gradient-to-r from-[#19b5af] to-[#14918c] hover:opacity-90"
           leftSection={<UserPlus size={24} />}
-          onClick={handleNewPatient}
+          onClick={handleAddAppointment}
         >
-          <div className="text-left">
-            <Text size="lg" fw={700}>
-              New Patient
-            </Text>
-            <Text size="xs" opacity={0.9}>
-              First-time visitor
-            </Text>
-          </div>
-        </Button>
-
-        <Button
-          size="xl"
-          className="h-20 bg-gradient-to-r from-blue-500 to-blue-600 hover:opacity-90"
-          leftSection={<RefreshCw size={24} />}
-          onClick={handleFollowUp}
-        >
-          <div className="text-left">
-            <Text size="lg" fw={700}>
-              Follow-up Visit
-            </Text>
-            <Text size="xs" opacity={0.9}>
-              Schedule return appointment
-            </Text>
-          </div>
+          <Text size="lg" fw={700}>
+            Add Appointment
+          </Text>
         </Button>
       </div>
 
@@ -528,6 +553,9 @@ export default function AppointmentsPage() {
                   <Text size="sm" fw={600} className="text-gray-700">
                     {time}
                   </Text>
+                  <Text size="xs" c="dimmed" mt={2}>
+                    ({convertToEthiopianTime(convertTo24Hour(time))} ET)
+                  </Text>
                 </div>
 
                 <div className="p-3">
@@ -589,14 +617,16 @@ export default function AppointmentsPage() {
                       color="gray"
                       fullWidth
                       size="sm"
+                      disabled={isPastDateTime(selectedDate, time)}
                       onClick={() => {
                         setSelectedSlot(time);
                         setAppointmentType(null);
+                        setBookingTab("new");
                         openBook();
                       }}
-                      className="text-gray-400 hover:text-[#19b5af] hover:bg-[#19b5af]/5"
+                      className="text-gray-400 hover:text-[#19b5af] hover:bg-[#19b5af]/5 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Click to book
+                      {isPastDateTime(selectedDate, time) ? "Past time" : "Click to book"}
                     </Button>
                   )}
                 </div>
@@ -663,7 +693,7 @@ export default function AppointmentsPage() {
                             <Group gap={6} mb={4}>
                               <Clock size={12} className="text-green-600" />
                               <Text size="xs" fw={600} className="text-green-700">
-                                {convertTo12Hour(apt.formatted_start_time)}
+                                {formatTimeWithET(apt.formatted_start_time)}
                               </Text>
                             </Group>
                             <Text size="sm" fw={600}>
@@ -959,7 +989,17 @@ export default function AppointmentsPage() {
                 placeholder="Choose available time slot"
                 required
                 size="lg"
-                data={timeSlots.filter((t) => !appointments[t])}
+                data={timeSlots
+                  .filter((t) => {
+                    // Filter out booked slots
+                    if (appointments[t]) return false;
+                    return true;
+                  })
+                  .map((t) => ({
+                    value: t,
+                    label: `${t} (${convertToEthiopianTime(convertTo24Hour(t))} ET)`,
+                    disabled: selectedDate ? isPastDateTime(selectedDate, t) : false,
+                  }))}
                 value={selectedSlot}
                 onChange={(value) => setSelectedSlot(value)}
               />
