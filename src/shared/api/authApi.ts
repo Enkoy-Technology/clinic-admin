@@ -10,8 +10,7 @@ const baseQuery = fetchBaseQuery({
   prepareHeaders: (headers) => {
     const token = localStorage.getItem("accessToken");
     if (token) {
-      const cleanToken = token.replace(/^(Bearer|JWT)\s+/i, "");
-      headers.set("Authorization", `JWT ${cleanToken}`);
+      headers.set("Authorization", `JWT ${token}`);
     }
     headers.set("accept", "*/*");
     headers.set("Content-Type", "application/json");

@@ -14,16 +14,19 @@ export interface Message {
 }
 
 export interface MessagesResponse {
-  links: {
+  links?: {
     next: string | null;
     previous: string | null;
   };
-  count: number;
-  results: Message[];
-  page_size: number;
-  current_page: number;
-  total_pages: number;
+  count?: number;
+  results?: Message[];
+  page_size?: number;
+  current_page?: number;
+  total_pages?: number;
 }
+
+// API can return either an array or an object with results
+export type MessagesApiResponse = MessagesResponse | Message[];
 
 export const messagesApi = createApi({
   reducerPath: "messagesApi",
@@ -41,6 +44,17 @@ export const messagesApi = createApi({
           url,
           params,
         };
+      },
+      transformResponse: (response: MessagesApiResponse): MessagesResponse => {
+        // Handle array response
+        if (Array.isArray(response)) {
+          return {
+            count: response.length,
+            results: response,
+          };
+        }
+        // Handle object response
+        return response;
       },
       providesTags: ["Messages"],
     }),

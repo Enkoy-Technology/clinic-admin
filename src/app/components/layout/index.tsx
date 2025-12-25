@@ -114,7 +114,10 @@ const ProtectedLayout = ({
   }, [userData, userFromRedux, dispatch]);
 
   const displayUser = userFromRedux || userData;
-  const unreadCount = messagesData?.count || 0;
+  // Handle both array response and object with count/results
+  const unreadCount = messagesData
+    ? (messagesData.count ?? messagesData.results?.length ?? 0)
+    : 0;
   const profileImageUrl = displayUser?.profile_picture?.startsWith("/media/")
     ? `https://ff-gng8.onrender.com${displayUser.profile_picture}`
     : displayUser?.profile_picture;
@@ -204,42 +207,48 @@ const ProtectedLayout = ({
                         </Text>
                       )}
                     </Menu.Label>
-                    {messagesData?.results && messagesData.results.length > 0 ? (
-                      <>
-                        {messagesData.results.slice(0, 5).map((message) => (
-                          <Menu.Item key={message.id}>
-                            <div>
-                              <Text size="sm" fw={500}>
-                                {message.name}
-                              </Text>
-                              <Text size="xs" c="dimmed" lineClamp={2}>
-                                {message.message}
-                              </Text>
-                              <Text size="xs" c="dimmed" mt={4}>
-                                {new Date(message.created_at).toLocaleDateString()}
-                              </Text>
-                            </div>
-                          </Menu.Item>
-                        ))}
-                        {messagesData.results.length > 5 && (
+                    {(() => {
+                      const messages = messagesData?.results ?? [];
+                      if (messages.length > 0) {
+                        return (
                           <>
-                            <Menu.Divider />
-                            <Menu.Item
-                              className="text-center text-[#19b5af]"
-                              onClick={() => router.push("/notifications")}
-                            >
-                              View all ({messagesData.count} messages)
-                            </Menu.Item>
+                            {messages.slice(0, 5).map((message) => (
+                              <Menu.Item key={message.id}>
+                                <div>
+                                  <Text size="sm" fw={500}>
+                                    {message.name}
+                                  </Text>
+                                  <Text size="xs" c="dimmed" lineClamp={2}>
+                                    {message.message}
+                                  </Text>
+                                  <Text size="xs" c="dimmed" mt={4}>
+                                    {new Date(message.created_at).toLocaleDateString()}
+                                  </Text>
+                                </div>
+                              </Menu.Item>
+                            ))}
+                            {unreadCount > 5 && (
+                              <>
+                                <Menu.Divider />
+                                <Menu.Item
+                                  className="text-center text-[#19b5af]"
+                                  onClick={() => router.push("/notifications")}
+                                >
+                                  View all ({unreadCount} messages)
+                                </Menu.Item>
+                              </>
+                            )}
                           </>
-                        )}
-                      </>
-                    ) : (
-                      <Menu.Item disabled>
-                        <Text size="sm" c="dimmed">
-                          No unread messages
-                        </Text>
-                      </Menu.Item>
-                    )}
+                        );
+                      }
+                      return (
+                        <Menu.Item disabled>
+                          <Text size="sm" c="dimmed">
+                            No unread messages
+                          </Text>
+                        </Menu.Item>
+                      );
+                    })()}
                   </Menu.Dropdown>
                 </Menu>
 
