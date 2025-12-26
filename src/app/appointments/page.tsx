@@ -34,12 +34,10 @@ import {
   Mail,
   MessageSquare,
   Phone,
-  RefreshCw,
   Trash2,
-  UserPlus,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   useCreateAppointmentMutation,
   useDeleteAppointmentMutation,
@@ -132,16 +130,18 @@ export default function AppointmentsPage() {
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [appointmentType, setAppointmentType] = useState<"new" | "followup" | null>(null);
   const [editingAppointment, setEditingAppointment] = useState<any>(null);
-  const [bookingTab, setBookingTab] = useState<string>("new");
 
   const [reminders, setReminders] = useState(mockReminders);
   const [autoReminders, setAutoReminders] = useState(true);
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
-  // Format date for API (YYYY-MM-DD)
+  // Format date for API (YYYY-MM-DD) - using local date components to avoid timezone issues
   const formatDateForAPI = (date: Date) => {
-    return date.toISOString().split("T")[0];
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
   // Helper function to get week days - defined before use
@@ -281,9 +281,8 @@ export default function AppointmentsPage() {
     return grouped;
   }, [appointmentsData]);
 
-  // Booking handler - single button for both new and follow-up
+  // Booking handler
   const handleAddAppointment = () => {
-    setBookingTab("new");
     setAppointmentType(null);
     setSelectedSlot(null);
     openBook();
@@ -327,54 +326,117 @@ export default function AppointmentsPage() {
   };
 
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
-  const [newPatientName, setNewPatientName] = useState("");
-  const [newPatientPhone, setNewPatientPhone] = useState("");
   const [deletingAppointmentId, setDeletingAppointmentId] = useState<number | null>(null);
+  const [selectedDoctor, setSelectedDoctor] = useState<string>("");
+  const [selectedService, setSelectedService] = useState<string>("");
+  const [appointmentReason, setAppointmentReason] = useState<string>("");
+  const [appointmentNotes, setAppointmentNotes] = useState<string>("");
+
+  // Set default doctor when doctors data loads
+  useEffect(() => {
+    if (doctorsData?.results?.[0] && !selectedDoctor) {
+      setSelectedDoctor(doctorsData.results[0].id.toString());
+    }
+  }, [doctorsData, selectedDoctor]);
 
   const handleQuickSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (selectedSlot && selectedDate) {
-      try {
-        // Convert 12-hour format to 24-hour format for API
-        const time24 = convertTo24Hour(selectedSlot);
+    if (!selectedSlot || !selectedDate) {
+      notifications.show({
+        title: "Error",
+        message: "Please select a time slot",
+        color: "red",
+      });
+      return;
+    }
 
-        // Calculate end time (add 30 minutes to start time)
-        const [hours, minutes] = time24.split(":");
-        const startDate = new Date(selectedDate);
-        startDate.setHours(parseInt(hours || "0"), parseInt(minutes || "0"), 0);
-        const endDate = new Date(startDate.getTime() + 30 * 60000);
+    // Patient ID is required
+    if (!selectedPatientId) {
+      notifications.show({
+        title: "Error",
+        message: "Please select a patient",
+        color: "red",
+      });
+      return;
+    }
 
-        const scheduledDate = formatDateForAPI(selectedDate);
-        if (!scheduledDate) return;
+    // Service is required
+    if (!selectedService) {
+      notifications.show({
+        title: "Error",
+        message: "Please select a service",
+        color: "red",
+      });
+      return;
+    }
 
-        // Prepare appointment payload
-        const appointmentPayload: any = {
-          scheduled_date: scheduledDate,
-          start_time: time24 + ":00",
-          end_time: `${endDate.getHours().toString().padStart(2, "0")}:${endDate.getMinutes().toString().padStart(2, "0")}:00`,
-          status: "SCHEDULED",
-        };
+    try {
+      // Format date as YYYY-MM-DD using local date components (avoid timezone issues)
+      const year = selectedDate.getFullYear();
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedDate.getDate()).padStart(2, '0');
+      const scheduledDate = `${year}-${month}-${day}`;
 
-        // Add patient ID if it's a follow-up appointment
-        if (bookingTab === "followup" && selectedPatientId) {
-          appointmentPayload.patient = parseInt(selectedPatientId);
-        }
-        // For new patients, the backend might create the patient automatically
-        // or we might need to create the patient first - adjust based on your API
+      // Convert 12-hour format to 24-hour format for API
+      const time24 = convertTo24Hour(selectedSlot);
 
-        await createAppointment(appointmentPayload).unwrap();
+      // Calculate end time (add 30 minutes to start time)
+      const [hours, minutes] = time24.split(":");
+      const startDate = new Date(selectedDate);
+      startDate.setHours(parseInt(hours || "0"), parseInt(minutes || "0"), 0);
+      const endDate = new Date(startDate.getTime() + 30 * 60000);
+      const endTime24 = `${endDate.getHours().toString().padStart(2, "0")}:${endDate.getMinutes().toString().padStart(2, "0")}`;
 
-        refetch();
-        closeBook();
-        setAppointmentType(null);
-        setSelectedSlot(null);
-        setSelectedPatientId(null);
-        setNewPatientName("");
-        setNewPatientPhone("");
-      } catch (error) {
-        console.error("Failed to create appointment:", error);
+      // Prepare appointment payload
+      const appointmentPayload: any = {
+        scheduled_date: scheduledDate,
+        start_time: time24 + ":00",
+        end_time: endTime24 + ":00",
+        status: "SCHEDULED",
+      };
+
+      // Add patient ID (required)
+      appointmentPayload.patient = parseInt(selectedPatientId);
+
+      // Add optional fields only if provided
+      if (selectedDoctor) {
+        appointmentPayload.doctor = parseInt(selectedDoctor);
+      } else {
+        appointmentPayload.doctor = 0; // Default to 0 if not provided
       }
+      // Service is required
+      appointmentPayload.service = parseInt(selectedService);
+      if (appointmentReason) {
+        appointmentPayload.reason = appointmentReason;
+      }
+      if (appointmentNotes) {
+        appointmentPayload.notes = appointmentNotes;
+      }
+
+      await createAppointment(appointmentPayload).unwrap();
+
+      notifications.show({
+        title: "Success",
+        message: "Appointment created successfully",
+        color: "green",
+      });
+
+      refetch();
+      closeBook();
+      setAppointmentType(null);
+      setSelectedSlot(null);
+      setSelectedPatientId(null);
+      setSelectedDoctor("");
+      setSelectedService("");
+      setAppointmentReason("");
+      setAppointmentNotes("");
+    } catch (error: any) {
+      notifications.show({
+        title: "Error",
+        message: error?.data?.detail || error?.data?.message || "Failed to create appointment",
+        color: "red",
+      });
     }
   };
 
@@ -558,9 +620,8 @@ export default function AppointmentsPage() {
 
   const formatDate = (date: Date) => {
     return date.toLocaleDateString("en-US", {
-      weekday: "long",
       year: "numeric",
-      month: "long",
+      month: "short",
       day: "numeric",
     });
   };
@@ -671,7 +732,7 @@ export default function AppointmentsPage() {
         <Button
           size="xl"
           className="h-16 w-full md:w-auto bg-gradient-to-r from-[#19b5af] to-[#14918c] hover:opacity-90"
-          leftSection={<UserPlus size={24} />}
+          leftSection={<Calendar size={24} />}
           onClick={handleAddAppointment}
         >
             <Text size="lg" fw={700}>
@@ -838,7 +899,6 @@ export default function AppointmentsPage() {
                       onClick={() => {
                         setSelectedSlot(time);
                         setAppointmentType(null);
-                        setBookingTab("new");
                         openBook();
                       }}
                       className="text-gray-400 hover:text-[#19b5af] hover:bg-[#19b5af]/5 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1157,72 +1217,52 @@ export default function AppointmentsPage() {
         onClose={closeBook}
         title={
           <Group>
-            {bookingTab === "new" ? (
-              <UserPlus size={20} className="text-[#19b5af]" />
-            ) : (
-              <RefreshCw size={20} className="text-blue-600" />
-            )}
+            <Calendar size={20} className="text-[#19b5af]" />
             <Text fw={600} size="lg">
-              {bookingTab === "new" ? "New Patient" : "Follow-up Visit"}
+              Book Appointment
             </Text>
           </Group>
         }
         size="lg"
       >
-        <Tabs value={bookingTab} onChange={(value) => setBookingTab(value || "new")}>
-          <Tabs.List grow mb="md">
-            <Tabs.Tab value="new" leftSection={<UserPlus size={16} />}>
-              New Patient
-            </Tabs.Tab>
-            <Tabs.Tab value="followup" leftSection={<RefreshCw size={16} />}>
-              Follow-up
-            </Tabs.Tab>
-          </Tabs.List>
+        <form onSubmit={handleQuickSave}>
+          <Stack gap="md">
+            <Select
+              label="Select Patient"
+              placeholder="Choose existing patient"
+              required
+              size="lg"
+              data={(patientsData?.results || []).map((p: any) => {
+                const fullName = `${p.profile?.user?.first_name || ""} ${p.profile?.user?.last_name || ""}`.trim() || p.name || "N/A";
+                const phone = p.profile?.phone_number || "N/A";
+                return {
+                  value: p.id.toString(),
+                  label: `${fullName} - ${phone}`,
+                };
+              })}
+              value={selectedPatientId}
+              onChange={setSelectedPatientId}
+              searchable
+              autoFocus
+            />
 
-          <form onSubmit={handleQuickSave}>
-            <Stack gap="md">
-              {bookingTab === "new" && (
-                <>
-                  <TextInput
-                    label="Patient Name"
-                    placeholder="Full name"
-                    required
-                    size="lg"
-                    autoFocus
-                    value={newPatientName}
-                    onChange={(e) => setNewPatientName(e.currentTarget.value)}
-                  />
-                  <TextInput
-                    label="Phone Number"
-                    placeholder="+251 911 234 567"
-                    required
-                    size="lg"
-                    value={newPatientPhone}
-                    onChange={(e) => setNewPatientPhone(e.currentTarget.value)}
-                  />
-                </>
-              )}
-
-              {bookingTab === "followup" && (
-                  <Select
-                    label="Select Patient"
-                    placeholder="Choose existing patient"
-                    required
-                    size="lg"
-                    data={(patientsData?.results || []).map((p: any) => {
-                      const fullName = `${p.profile?.user?.first_name || ""} ${p.profile?.user?.last_name || ""}`.trim() || p.name || "N/A";
-                      const phone = p.profile?.phone_number || "N/A";
-                      return {
-                        value: p.id.toString(),
-                        label: `${fullName} - ${phone}`,
-                      };
-                    })}
-                    value={selectedPatientId}
-                    onChange={setSelectedPatientId}
-                    searchable
-                    autoFocus
-                  />
-              )}
+            <DatePickerInput
+              label="Scheduled Date"
+              placeholder="Select date"
+              required
+              size="lg"
+              leftSection={<Calendar size={16} />}
+              minDate={new Date()}
+              value={selectedDate}
+              valueFormat="MMM D, YYYY"
+              onChange={(date) => {
+                if (date) {
+                  setSelectedDate(date);
+                  // Clear selected slot when date changes to avoid conflicts
+                  setSelectedSlot(null);
+                }
+              }}
+            />
 
               <Select
                 label="Select Time"
@@ -1231,9 +1271,18 @@ export default function AppointmentsPage() {
                 size="lg"
                 data={timeSlots
                   .filter((t) => {
-                    // Filter out booked slots
-                    if (appointments[t]) return false;
-                    return true;
+                    // Filter out booked slots for the selected date
+                    const dateKey = formatDateForAPI(selectedDate);
+                    if (!appointmentsData?.appointments) return true;
+
+                    // Check if this time slot is booked on the selected date
+                    const isBooked = appointmentsData.appointments.some((apt: any) => {
+                      if (apt.formatted_date !== dateKey) return false;
+                      const aptTime12 = convertTo12Hour(apt.formatted_start_time);
+                      return aptTime12 === t;
+                    });
+
+                    return !isBooked;
                   })
                   .map((t) => ({
                     value: t,
@@ -1244,29 +1293,74 @@ export default function AppointmentsPage() {
                 onChange={(value) => setSelectedSlot(value)}
               />
 
-              <Group justify="flex-end" mt="md">
-                <Button
-                  variant="light"
-                  onClick={closeBook}
-                  size="lg"
-                  disabled={isCreatingAppointment}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  size="lg"
-                  className="bg-[#19b5af] hover:bg-[#14918c]"
-                  leftSection={<Check size={18} />}
-                  disabled={!selectedSlot || isCreatingAppointment}
-                  loading={isCreatingAppointment}
-                >
-                  Book Appointment
-                </Button>
-              </Group>
-            </Stack>
-          </form>
-        </Tabs>
+              <Select
+                label="Doctor (Optional)"
+                placeholder="Select doctor"
+                size="lg"
+                data={(doctorsData?.results || []).map((doctor: any) => {
+                  const doctorName = `${doctor.profile?.user?.first_name || ""} ${doctor.profile?.user?.last_name || ""}`.trim() || doctor.name || "N/A";
+                  return {
+                    value: doctor.id.toString(),
+                    label: doctorName,
+                  };
+                })}
+                value={selectedDoctor}
+                onChange={(value) => setSelectedDoctor(value || "")}
+                searchable
+              />
+
+              <Select
+                label="Service"
+                placeholder="Select service"
+                required
+                size="lg"
+                data={(servicesData?.results || []).map((service: any) => ({
+                  value: service.id.toString(),
+                  label: service.name,
+                }))}
+                value={selectedService}
+                onChange={(value) => setSelectedService(value || "")}
+                searchable
+              />
+
+              <TextInput
+                label="Reason (Optional)"
+                placeholder="Reason for appointment"
+                size="lg"
+                value={appointmentReason}
+                onChange={(e) => setAppointmentReason(e.currentTarget.value)}
+              />
+
+              <Textarea
+                label="Notes (Optional)"
+                placeholder="Additional notes"
+                rows={3}
+                value={appointmentNotes}
+                onChange={(e) => setAppointmentNotes(e.currentTarget.value)}
+              />
+
+            <Group justify="flex-end" mt="md">
+              <Button
+                variant="light"
+                onClick={closeBook}
+                size="lg"
+                disabled={isCreatingAppointment}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                size="lg"
+                className="bg-[#19b5af] hover:bg-[#14918c]"
+                leftSection={<Check size={18} />}
+                disabled={!selectedSlot || !selectedPatientId || !selectedService || isCreatingAppointment}
+                loading={isCreatingAppointment}
+              >
+                Book Appointment
+              </Button>
+            </Group>
+          </Stack>
+        </form>
       </Modal>
 
       {/* Edit Appointment Modal */}
