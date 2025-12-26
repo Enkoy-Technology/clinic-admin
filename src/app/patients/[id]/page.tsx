@@ -90,6 +90,23 @@ const formatTimeWithET = (time24: string) => {
   return `${time12} (${timeET} ET)`;
 };
 
+// Helper function to format date to "Month Day, Year" format
+const formatDate = (dateString: string) => {
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return dateString; // Return original if invalid
+    }
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  } catch (error) {
+    return dateString; // Return original if error
+  }
+};
+
 // Helper function to convert 12-hour to 24-hour format
 const convertTo24Hour = (time12: string) => {
   const match = time12.match(/(\d+):(\d+)\s*(AM|PM)/i);
@@ -236,10 +253,16 @@ export default function PatientDetailPage() {
 
   const handleCreateAppointment = async (values: typeof appointmentForm.values) => {
     try {
-      // Ensure we have a valid date
-      const selectedDate = values.scheduled_date instanceof Date
-        ? values.scheduled_date
-        : new Date(values.scheduled_date);
+      // Ensure we have a valid date - use the form value directly
+      let selectedDate: Date;
+
+      if (values.scheduled_date instanceof Date) {
+        selectedDate = values.scheduled_date;
+      } else if (typeof values.scheduled_date === 'string') {
+        selectedDate = new Date(values.scheduled_date);
+      } else {
+        selectedDate = new Date(values.scheduled_date);
+      }
 
       if (isNaN(selectedDate.getTime())) {
         notifications.show({
@@ -250,7 +273,13 @@ export default function PatientDetailPage() {
         return;
       }
 
-      const scheduledDate = selectedDate.toISOString().split("T")[0];
+      // Format date as YYYY-MM-DD using local date components (avoid timezone issues)
+      // Use getFullYear, getMonth, getDate to avoid timezone conversion issues
+      const year = selectedDate.getFullYear();
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedDate.getDate()).padStart(2, '0');
+      const scheduledDate = `${year}-${month}-${day}`;
+
       const time24 = convertTo24Hour(values.start_time);
 
       // Calculate end time (add 30 minutes to start time)
@@ -295,17 +324,23 @@ export default function PatientDetailPage() {
         color: "green",
       });
 
-      appointmentForm.reset();
-      // Reset to defaults
-      if (defaultDoctor) {
-        appointmentForm.setFieldValue("doctor", defaultDoctor);
-      }
-      if (defaultService) {
-        appointmentForm.setFieldValue("service", defaultService);
-      }
-      appointmentForm.setFieldValue("status", "SCHEDULED");
-      appointmentForm.setFieldValue("scheduled_date", new Date());
+      // Don't reset the form immediately - close modal first
       setAppointmentModalOpened(false);
+
+      // Reset form after a short delay to ensure modal is closed
+      setTimeout(() => {
+        appointmentForm.reset();
+        // Reset to defaults
+        if (defaultDoctor) {
+          appointmentForm.setFieldValue("doctor", defaultDoctor);
+        }
+        if (defaultService) {
+          appointmentForm.setFieldValue("service", defaultService);
+        }
+        appointmentForm.setFieldValue("status", "SCHEDULED");
+        appointmentForm.setFieldValue("scheduled_date", new Date());
+      }, 100);
+
       refetchAppointments();
     } catch (error: any) {
       notifications.show({
@@ -579,7 +614,7 @@ export default function PatientDetailPage() {
                           <Table.Td>
                             <Group gap={6}>
                               <Calendar size={14} className="text-gray-400" />
-                              <Text size="xs">{invoiceDate}</Text>
+                              <Text size="xs">{formatDate(invoiceDate)}</Text>
                             </Group>
                           </Table.Td>
                           <Table.Td>
@@ -668,7 +703,7 @@ export default function PatientDetailPage() {
                         <Table.Td>
                           <Group gap={6}>
                             <Calendar size={14} className="text-gray-400" />
-                            <Text size="xs">{apt.formatted_date}</Text>
+                            <Text size="xs">{formatDate(apt.scheduled_date || apt.formatted_date)}</Text>
                           </Group>
                         </Table.Td>
                         <Table.Td>
@@ -779,11 +814,7 @@ export default function PatientDetailPage() {
               required
               leftSection={<Calendar size={16} />}
               minDate={new Date()}
-              value={appointmentForm.values.scheduled_date}
-              onChange={(date) => {
-                appointmentForm.setFieldValue("scheduled_date", date || new Date());
-              }}
-              error={appointmentForm.errors.scheduled_date}
+              {...appointmentForm.getInputProps("scheduled_date")}
             />
 
             <Select

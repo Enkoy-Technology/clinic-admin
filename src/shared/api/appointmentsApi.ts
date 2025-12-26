@@ -79,17 +79,17 @@ export const appointmentsApi = createApi({
       }),
       invalidatesTags: ["Appointments"],
     }),
-    updateAppointment: builder.mutation<Appointment, { id: number; data: Partial<Appointment> }>({
+    updateAppointment: builder.mutation<Appointment, { id: number; data: Partial<CreateAppointmentRequest> }>({
       query: ({ id, data }) => ({
-        url: `/appointments/active/${id}`,
-        method: "PUT",
+        url: `/appointments/${id}/`,
+        method: "PATCH",
         body: data,
       }),
       invalidatesTags: ["Appointments"],
     }),
     deleteAppointment: builder.mutation<void, number>({
       query: (id) => ({
-        url: `/appointments/active/${id}`,
+        url: `/appointments/${id}/`,
         method: "DELETE",
       }),
       invalidatesTags: ["Appointments"],

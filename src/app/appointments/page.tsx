@@ -14,10 +14,14 @@ import {
   Switch,
   Tabs,
   Text,
+  Textarea,
   TextInput,
   Title,
 } from "@mantine/core";
+import { DatePickerInput } from "@mantine/dates";
+import { useForm } from "@mantine/form";
 import { useDisclosure } from "@mantine/hooks";
+import { notifications } from "@mantine/notifications";
 import {
   Bell,
   Calendar,
@@ -40,7 +44,9 @@ import {
   useGetActiveAppointmentsQuery,
   useUpdateAppointmentMutation,
 } from "../../shared/api/appointmentsApi";
+import { useGetDoctorsQuery } from "../../shared/api/doctorsApi";
 import { useGetPatientsQuery } from "../../shared/api/patientsApi";
+import { useGetServicesQuery } from "../../shared/api/servicesApi";
 
 // Time slots in 24-hour format for backend
 const timeSlots24 = [
@@ -194,6 +200,18 @@ export default function AppointmentsPage() {
     }
   );
 
+  // Fetch doctors for edit form
+  const { data: doctorsData } = useGetDoctorsQuery(
+    { page: 1, per_page: 100 },
+    { refetchOnMountOrArgChange: true }
+  );
+
+  // Fetch services for edit form
+  const { data: servicesData } = useGetServicesQuery(
+    { page: 1, per_page: 1000 },
+    { refetchOnMountOrArgChange: true }
+  );
+
   // Convert API appointments to time slot format
   const appointments = useMemo(() => {
     if (!appointmentsData?.appointments) {
@@ -281,6 +299,21 @@ export default function AppointmentsPage() {
     return appointmentDateTime < now;
   };
 
+  // Check if appointment is in the future
+  const isAppointmentInFuture = (appointment: any): boolean => {
+    if (!appointment.scheduled_date || !appointment.formatted_start_time) {
+      return false;
+    }
+    const appointmentDate = new Date(appointment.scheduled_date);
+    const [hours, minutes] = appointment.formatted_start_time.split(":");
+    appointmentDate.setHours(parseInt(hours || "0"), parseInt(minutes || "0"), 0, 0);
+
+    const now = new Date();
+    now.setSeconds(0, 0);
+
+    return appointmentDate > now;
+  };
+
   // Check if a date is in the past
   const isPastDate = (date: Date): boolean => {
     const today = new Date();
@@ -341,41 +374,155 @@ export default function AppointmentsPage() {
     }
   };
 
+  // Edit form
+  const editForm = useForm({
+    initialValues: {
+      patient: "",
+      doctor: "",
+      service: "",
+      scheduled_date: new Date(),
+      start_time: "",
+      end_time: "",
+      status: "SCHEDULED" as "SCHEDULED" | "CONFIRMED" | "COMPLETED" | "CANCELLED" | "NO_SHOW",
+      reason: "",
+      notes: "",
+    },
+    validate: {
+      scheduled_date: (value) => (!value ? "Date is required" : null),
+      start_time: (value) => (!value ? "Start time is required" : null),
+    },
+  });
+
   const handleEditAppointment = (time: string, appointment: any) => {
+    if (!isAppointmentInFuture(appointment)) {
+      notifications.show({
+        title: "Cannot Edit",
+        message: "Only future appointments can be edited",
+        color: "orange",
+      });
+      return;
+    }
+
+    // Populate form with appointment data
+    const appointmentDate = appointment.scheduled_date
+      ? new Date(appointment.scheduled_date)
+      : new Date();
+
+    editForm.setValues({
+      patient: appointment.patientId?.toString() || "",
+      doctor: appointment.doctor?.id?.toString() || appointment.doctor?.toString() || "",
+      service: appointment.service?.id?.toString() || appointment.service?.toString() || "",
+      scheduled_date: appointmentDate,
+      start_time: convertTo12Hour(appointment.formatted_start_time || appointment.start_time || ""),
+      end_time: convertTo12Hour(appointment.formatted_end_time || appointment.end_time || ""),
+      status: appointment.status || "SCHEDULED",
+      reason: appointment.reason || "",
+      notes: appointment.notes || "",
+    });
+
     setEditingAppointment({ time, ...appointment });
     openEdit();
   };
 
-  const handleUpdateAppointment = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleUpdateAppointment = async (values: typeof editForm.values) => {
+    if (!editingAppointment) return;
 
-    if (editingAppointment) {
-      try {
-        await updateAppointment({
-          id: editingAppointment.id,
-          data: {
-            status: editingAppointment.status || "SCHEDULED",
-            // Add other fields that can be updated if needed
-          },
-        }).unwrap();
+    try {
+      const scheduledDate = values.scheduled_date.toISOString().split("T")[0];
+      const time24 = convertTo24Hour(values.start_time);
 
-        refetch();
-        closeEdit();
-        setEditingAppointment(null);
-      } catch (error) {
-        console.error("Failed to update appointment:", error);
+      // Calculate end time (add 30 minutes to start time if end_time not provided)
+      let endTime24 = "";
+      if (values.end_time) {
+        endTime24 = convertTo24Hour(values.end_time);
+      } else {
+        const [hours, minutes] = time24.split(":");
+        const startDate = new Date(values.scheduled_date);
+        startDate.setHours(parseInt(hours || "0"), parseInt(minutes || "0"), 0);
+        const endDate = new Date(startDate.getTime() + 30 * 60000);
+        endTime24 = `${endDate.getHours().toString().padStart(2, "0")}:${endDate.getMinutes().toString().padStart(2, "0")}`;
       }
+
+      const updatePayload: any = {
+        scheduled_date: scheduledDate,
+        start_time: time24 + ":00",
+        end_time: endTime24 + ":00",
+        status: values.status,
+      };
+
+      // Add optional fields only if provided
+      if (values.patient) {
+        updatePayload.patient = parseInt(values.patient);
+      } else {
+        updatePayload.patient = editingAppointment.patientId || 0;
+      }
+      if (values.doctor) {
+        updatePayload.doctor = parseInt(values.doctor);
+      } else {
+        updatePayload.doctor = 0;
+      }
+      if (values.service) {
+        updatePayload.service = parseInt(values.service);
+      } else {
+        updatePayload.service = 0;
+      }
+      if (values.reason) {
+        updatePayload.reason = values.reason;
+      }
+      if (values.notes) {
+        updatePayload.notes = values.notes;
+      }
+
+      await updateAppointment({
+        id: editingAppointment.id,
+        data: updatePayload,
+      }).unwrap();
+
+      notifications.show({
+        title: "Success",
+        message: "Appointment updated successfully",
+        color: "green",
+      });
+
+      refetch();
+      closeEdit();
+      setEditingAppointment(null);
+      editForm.reset();
+    } catch (error: any) {
+      notifications.show({
+        title: "Error",
+        message: error?.data?.detail || error?.data?.message || "Failed to update appointment",
+        color: "red",
+      });
     }
   };
 
   const handleDeleteAppointment = async (time: string) => {
     const appointment = appointments[time];
     if (appointment?.id) {
+      if (!isAppointmentInFuture(appointment)) {
+        notifications.show({
+          title: "Cannot Delete",
+          message: "Only future appointments can be deleted",
+          color: "orange",
+        });
+        return;
+      }
+
       try {
         await deleteAppointment(appointment.id).unwrap();
+        notifications.show({
+          title: "Success",
+          message: "Appointment deleted successfully",
+          color: "green",
+        });
         refetch();
-      } catch (error) {
-        console.error("Failed to delete appointment:", error);
+      } catch (error: any) {
+        notifications.show({
+          title: "Error",
+          message: error?.data?.detail || error?.data?.message || "Failed to delete appointment",
+          color: "red",
+        });
       }
     }
   };
@@ -633,32 +780,36 @@ export default function AppointmentsPage() {
                         </Group>
                       </div>
                       <Group gap={4}>
-                        <ActionIcon
-                          size="sm"
-                          variant="light"
-                          color="blue"
-                          onClick={() => handleEditAppointment(time, appointment)}
-                          title="Edit"
-                        >
-                          <Edit size={14} />
-                        </ActionIcon>
+                        {isAppointmentInFuture(appointment) && (
+                          <>
+                            <ActionIcon
+                              size="sm"
+                              variant="light"
+                              color="blue"
+                              onClick={() => handleEditAppointment(time, appointment)}
+                              title="Edit"
+                            >
+                              <Edit size={14} />
+                            </ActionIcon>
+                            <ActionIcon
+                              size="sm"
+                              variant="light"
+                              color="red"
+                              onClick={() => handleDeleteAppointment(time)}
+                              title="Delete"
+                            >
+                              <Trash2 size={14} />
+                            </ActionIcon>
+                          </>
+                        )}
                         <ActionIcon
                           size="sm"
                           variant="light"
                           color="green"
-                              onClick={() => (window.location.href = `tel:${appointment.phone}`)}
+                          onClick={() => (window.location.href = `tel:${appointment.phone}`)}
                           title="Call"
                         >
                           <Phone size={14} />
-                        </ActionIcon>
-                        <ActionIcon
-                          size="sm"
-                          variant="light"
-                          color="red"
-                          onClick={() => handleDeleteAppointment(time)}
-                          title="Delete"
-                        >
-                          <Trash2 size={14} />
                         </ActionIcon>
                       </Group>
                     </div>
@@ -1100,7 +1251,11 @@ export default function AppointmentsPage() {
       {/* Edit Appointment Modal */}
       <Modal
         opened={editModalOpened}
-        onClose={closeEdit}
+        onClose={() => {
+          closeEdit();
+          setEditingAppointment(null);
+          editForm.reset();
+        }}
         title={
           <Group>
             <Edit size={20} className="text-blue-600" />
@@ -1109,30 +1264,86 @@ export default function AppointmentsPage() {
             </Text>
           </Group>
         }
-        size="md"
+        size="lg"
       >
-        <form onSubmit={handleUpdateAppointment}>
+        <form onSubmit={editForm.onSubmit(handleUpdateAppointment)}>
           <Stack gap="md">
-            <TextInput
-              name="patient"
-              label="Patient Name"
-              value={editingAppointment?.patient || ""}
-              onChange={(e) => setEditingAppointment({ ...editingAppointment, patient: e.currentTarget.value })}
+            <Select
+              label="Patient"
+              placeholder="Select patient"
               required
-              size="lg"
+              data={(patientsData?.results || []).map((p: any) => {
+                const fullName = `${p.profile?.user?.first_name || ""} ${p.profile?.user?.last_name || ""}`.trim() || p.name || "N/A";
+                return {
+                  value: p.id.toString(),
+                  label: fullName,
+                };
+              })}
+              {...editForm.getInputProps("patient")}
+              searchable
             />
-            <TextInput
-              name="phone"
-              label="Phone Number"
-              value={editingAppointment?.phone || ""}
-              onChange={(e) => setEditingAppointment({ ...editingAppointment, phone: e.currentTarget.value })}
+
+            <Select
+              label="Doctor"
+              placeholder="Select doctor"
+              data={(doctorsData?.results || []).map((doctor: any) => {
+                const doctorName = `${doctor.profile?.user?.first_name || ""} ${doctor.profile?.user?.last_name || ""}`.trim() || doctor.name || "N/A";
+                return {
+                  value: doctor.id.toString(),
+                  label: doctorName,
+                };
+              })}
+              {...editForm.getInputProps("doctor")}
+              searchable
+            />
+
+            <Select
+              label="Service"
+              placeholder="Select service"
+              data={(servicesData?.results || []).map((service: any) => ({
+                value: service.id.toString(),
+                label: service.name,
+              }))}
+              {...editForm.getInputProps("service")}
+              searchable
+            />
+
+            <DatePickerInput
+              label="Scheduled Date"
+              placeholder="Select date"
               required
-              size="lg"
+              leftSection={<Calendar size={16} />}
+              minDate={new Date()}
+              value={editForm.values.scheduled_date}
+              onChange={(date) => {
+                editForm.setFieldValue("scheduled_date", date || new Date());
+              }}
+              error={editForm.errors.scheduled_date}
             />
+
+            <Select
+              label="Start Time"
+              placeholder="Select time"
+              required
+              data={timeSlots.map((t) => ({
+                value: t,
+                label: `${t} (${convertToEthiopianTime(convertTo24Hour(t))} ET)`,
+              }))}
+              {...editForm.getInputProps("start_time")}
+            />
+
+            {/* <Select
+              label="End Time (Optional)"
+              placeholder="Select time"
+              data={timeSlots.map((t) => ({
+                value: t,
+                label: `${t} (${convertToEthiopianTime(convertTo24Hour(t))} ET)`,
+              }))}
+              {...editForm.getInputProps("end_time")}
+            /> */}
+
             <Select
               label="Status"
-              value={editingAppointment?.status || "SCHEDULED"}
-              onChange={(value) => setEditingAppointment({ ...editingAppointment, status: value as any })}
               data={[
                 { value: "SCHEDULED", label: "Scheduled" },
                 { value: "CONFIRMED", label: "Confirmed" },
@@ -1140,14 +1351,41 @@ export default function AppointmentsPage() {
                 { value: "CANCELLED", label: "Cancelled" },
                 { value: "NO_SHOW", label: "No Show" },
               ]}
-              size="lg"
+              {...editForm.getInputProps("status")}
             />
+
+            <TextInput
+              label="Reason (Optional)"
+              placeholder="Reason for appointment"
+              {...editForm.getInputProps("reason")}
+            />
+
+            <Textarea
+              label="Notes (Optional)"
+              placeholder="Additional notes"
+              rows={3}
+              {...editForm.getInputProps("notes")}
+            />
+
             <Group justify="flex-end" mt="md">
-              <Button variant="light" onClick={closeEdit} size="lg">
+              <Button
+                variant="light"
+                onClick={() => {
+                  closeEdit();
+                  setEditingAppointment(null);
+                  editForm.reset();
+                }}
+                size="lg"
+              >
                 Cancel
               </Button>
-              <Button type="submit" size="lg" className="bg-blue-600 hover:bg-blue-700" leftSection={<Check size={18} />}>
-                Update
+              <Button
+                type="submit"
+                size="lg"
+                className="bg-blue-600 hover:bg-blue-700"
+                leftSection={<Check size={18} />}
+              >
+                Update Appointment
               </Button>
             </Group>
           </Stack>
