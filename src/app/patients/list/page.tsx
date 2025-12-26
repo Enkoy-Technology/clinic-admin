@@ -1,46 +1,46 @@
 "use client";
 
 import {
-  ActionIcon,
-  Avatar,
-  Badge,
-  Box,
-  Button,
-  Card,
-  Checkbox,
-  Group,
-  Loader,
-  Menu,
-  Modal,
-  NumberInput,
-  Progress,
-  Select,
-  Stack,
-  Table,
-  Tabs,
-  Text,
-  Textarea,
-  TextInput,
-  Title
+    ActionIcon,
+    Avatar,
+    Badge,
+    Box,
+    Button,
+    Card,
+    Checkbox,
+    Group,
+    Loader,
+    Menu,
+    Modal,
+    NumberInput,
+    Progress,
+    Select,
+    Stack,
+    Table,
+    Tabs,
+    Text,
+    Textarea,
+    TextInput,
+    Title
 } from "@mantine/core";
 import { DatePickerInput } from "@mantine/dates";
 import { useForm } from "@mantine/form";
 import { useDisclosure } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import {
-  Calendar,
-  Download,
-  Edit,
-  Eye,
-  FileText,
-  Home,
-  Mail,
-  MoreVertical,
-  Phone,
-  Plus,
-  Search,
-  Trash2,
-  User
+    Calendar,
+    Download,
+    Edit,
+    Eye,
+    FileText,
+    Home,
+    Mail,
+    MoreVertical,
+    Phone,
+    Plus,
+    Search,
+    Trash2,
+    User
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -259,7 +259,7 @@ export default function PatientListPage() {
       let hasMore = true;
 
       while (hasMore) {
-        const response = await fetch(`https://ff-gng8.onrender.com/api/patients/?page=${currentPageNum}&per_page=100`, {
+        const response = await fetch(`https://demo-oxua.onrender.com/api/patients/?page=${currentPageNum}&per_page=100`, {
           headers: {
             Authorization: `JWT ${localStorage.getItem("accessToken")}`,
             accept: "application/json",

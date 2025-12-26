@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const API_BASE_URL = "https://ff-gng8.onrender.com/api";
+const API_BASE_URL = "https://demo-oxua.onrender.com/api";
 
 export async function GET(
   request: NextRequest,

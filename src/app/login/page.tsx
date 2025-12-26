@@ -85,7 +85,7 @@ export default function LoginPage() {
   // Quick fill demo credentials
   const fillDemoCredentials = () => {
     form.setValues({
-      email: "admin@gmail.com",
+      email: "admin1@gmail.com",
       password: "admin@561!",
     });
   };

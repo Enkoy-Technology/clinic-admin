@@ -1,34 +1,34 @@
 "use client";
 
 import {
-  Avatar,
-  Badge,
-  Box,
-  Button,
-  Card,
-  Divider,
-  Grid,
-  Group,
-  Stack,
-  Text,
-  Title,
-  Tabs,
-  SimpleGrid,
-  Loader,
-  Alert,
+    Alert,
+    Avatar,
+    Badge,
+    Box,
+    Button,
+    Card,
+    Divider,
+    Grid,
+    Group,
+    Loader,
+    SimpleGrid,
+    Stack,
+    Tabs,
+    Text,
+    Title,
 } from "@mantine/core";
 import {
-  IconUser,
-  IconMail,
-  IconPhone,
-  IconMapPin,
-  IconCalendar,
-  IconShield,
-  IconEdit,
-  IconLock,
-  IconAlertCircle,
-  IconKey,
-  IconBuilding,
+    IconAlertCircle,
+    IconBuilding,
+    IconCalendar,
+    IconEdit,
+    IconKey,
+    IconLock,
+    IconMail,
+    IconMapPin,
+    IconPhone,
+    IconShield,
+    IconUser,
 } from "@tabler/icons-react";
 import { useGetCurrentUserQuery } from "../../shared/api/authApi";
 
@@ -58,7 +58,7 @@ export default function ProfilePage() {
   }
 
   const profileImageUrl = user.profile_picture?.startsWith('/media/')
-    ? `https://ff-gng8.onrender.com${user.profile_picture}`
+    ? `https://demo-oxua.onrender.com${user.profile_picture}`
     : user.profile_picture;
 
   return (

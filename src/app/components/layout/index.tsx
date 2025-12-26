@@ -1,25 +1,25 @@
 "use client";
 
 import {
-  ActionIcon,
-  AppShell,
-  Avatar,
-  Box,
-  Group,
-  Indicator,
-  Menu,
-  ScrollArea,
-  Text,
-  UnstyledButton,
+    ActionIcon,
+    AppShell,
+    Avatar,
+    Box,
+    Group,
+    Indicator,
+    Menu,
+    ScrollArea,
+    Text,
+    UnstyledButton,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import {
-  IconBell,
-  IconChevronDown,
-  IconLogout,
-  IconMenu2 as IconMenu,
-  IconSettings,
-  IconUser,
+    IconBell,
+    IconChevronDown,
+    IconLogout,
+    IconMenu2 as IconMenu,
+    IconSettings,
+    IconUser,
 } from "@tabler/icons-react";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -29,9 +29,9 @@ import { useGetCurrentUserQuery } from "../../../shared/api/authApi";
 import { useGetUnreadMessagesQuery } from "../../../shared/api/messagesApi";
 import AuthGuard from "../../../shared/components/AuthGuard";
 import {
-  logout,
-  selectCurrentUser,
-  setUser,
+    logout,
+    selectCurrentUser,
+    setUser,
 } from "../../../shared/slices/authSlice";
 import ClientNavWrapper from "../clientNavWrapper/clientNavWrapper";
 import menuItems from "../dashboard/menu_items";
@@ -124,7 +124,7 @@ const ProtectedLayout = ({
     ? (messagesData.count ?? messagesData.results?.length ?? 0)
     : 0;
   const profileImageUrl = displayUser?.profile_picture?.startsWith("/media/")
-    ? `https://ff-gng8.onrender.com${displayUser.profile_picture}`
+    ? `https://demo-oxua.onrender.com${displayUser.profile_picture}`
     : displayUser?.profile_picture;
 
   return (

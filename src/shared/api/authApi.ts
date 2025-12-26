@@ -2,7 +2,7 @@ import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from "@reduxjs/toolk
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import { updateAccessToken } from "../slices/authSlice";
 
-const API_BASE_URL = "https://ff-gng8.onrender.com/api";
+const API_BASE_URL = "https://demo-oxua.onrender.com/api";
 
 // Base query function that handles token refresh on 401 errors
 const baseQuery = fetchBaseQuery({
