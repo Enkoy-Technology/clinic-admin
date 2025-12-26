@@ -2,6 +2,7 @@ import {
   IconBellRinging,
   IconCalendar,
   IconDashboard,
+  IconReportMedical,
   IconStethoscope,
   IconUsers
 } from "@tabler/icons-react";
@@ -22,34 +23,21 @@ const menuItems = [
   {
     icon: IconUsers,
     label: "Patients",
+    link: "/patients/list",
     category: "Clinical",
-    subItems: [
-      { label: "Patient List", link: "/patients/list" },
-      { label: "Patient Records", link: "/patients/records" },
-      { label: "Treatment Plans", link: "/patients/treatment-plans" },
-    ],
   },
   {
     icon: IconStethoscope,
-    label: "Staff",
+    label: "Dentists",
+    link: "/staff/dentists",
     category: "Clinical",
-    subItems: [
-      { label: "Dentists", link: "/staff/dentists" },
-      // { label: "Hygienists", link: "/staff/hygienists" },
-      // { label: "Assistants", link: "/staff/assistants" },
-      // { label: "Receptionists", link: "/staff/receptionists" },
-    ],
   },
-  // {
-  //   icon: IconReportMedical,
-  //   label: "Services",
-  //   category: "Clinical",
-  //   subItems: [
-  //     { label: "Treatments", link: "/services/treatments" },
-  //     { label: "Procedures", link: "/services/procedures" },
-  //     { label: "Specialties", link: "/services/specialties" },
-  //   ],
-  // },
+  {
+    icon: IconReportMedical,
+    label: "Services",
+    link: "/services",
+    category: "Clinical",
+  },
 
   // Business Management
   // {
