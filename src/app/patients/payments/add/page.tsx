@@ -27,6 +27,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useGetPatientsQuery } from "../../../../shared/api/patientsApi";
 import { useCreateInvoiceMutation, useCreatePaymentMutation } from "../../../../shared/api/paymentsApi";
+import { useCreateServiceMutation, useGetServicesQuery } from "../../../../shared/api/servicesApi";
 
 export default function AddPaymentPage() {
   const router = useRouter();
@@ -35,10 +36,19 @@ export default function AddPaymentPage() {
   const invoicesParam = searchParams.get("invoices");
 
   const [selectedInvoice, setSelectedInvoice] = useState<string | null>(null);
+  const [isAddingNewService, setIsAddingNewService] = useState(false);
+  const [newServiceName, setNewServiceName] = useState("");
 
   // Fetch patient data
   const { data: patientsData } = useGetPatientsQuery({ page: 1, per_page: 100 });
   const patient = patientsData?.results?.find((p: any) => p.id.toString() === patientId);
+
+  // Fetch services
+  const { data: servicesData, isLoading: isLoadingServices, refetch: refetchServices } = useGetServicesQuery({
+    page: 1,
+    per_page: 1000, // Get all services
+  });
+  const [createService, { isLoading: isCreatingService }] = useCreateServiceMutation();
 
   // Parse invoices from URL params (passed from records page)
   let invoicesData: any = null;
@@ -278,14 +288,101 @@ export default function AddPaymentPage() {
 
                 {paymentType === "new" ? (
                   <>
-                    <TextInput
-                      label="Service/Invoice Name"
-                      placeholder="e.g., Root Canal Treatment, Consultation, Teeth Cleaning, etc."
-                      description="Enter the service name. You can use the same service name for different patients with different prices."
-                      required
-                      leftSection={<FileText size={16} />}
-                      {...paymentForm.getInputProps("service_name")}
-                    />
+                    {isAddingNewService ? (
+                      <>
+                        <TextInput
+                          label="New Service Name"
+                          placeholder="e.g., Root Canal Treatment, Consultation, etc."
+                          description="Enter a new service name"
+                          required
+                          leftSection={<FileText size={16} />}
+                          value={newServiceName}
+                          onChange={(e) => {
+                            setNewServiceName(e.currentTarget.value);
+                            paymentForm.setFieldValue("service_name", e.currentTarget.value);
+                          }}
+                          rightSection={
+                            <Button
+                              variant="subtle"
+                              size="xs"
+                              onClick={async () => {
+                                if (!newServiceName.trim()) {
+                                  notifications.show({
+                                    title: "Error",
+                                    message: "Service name is required",
+                                    color: "red",
+                                  });
+                                  return;
+                                }
+                                try {
+                                  await createService({
+                                    name: newServiceName.trim(),
+                                    is_active: true,
+                                    description: "",
+                                  }).unwrap();
+                                  notifications.show({
+                                    title: "Success",
+                                    message: "Service created successfully",
+                                    color: "green",
+                                  });
+                                  // Refetch services to include the new one
+                                  await refetchServices();
+                                  // Set the service name and exit add mode
+                                  paymentForm.setFieldValue("service_name", newServiceName.trim());
+                                  setIsAddingNewService(false);
+                                  setNewServiceName("");
+                                } catch (error: any) {
+                                  notifications.show({
+                                    title: "Error",
+                                    message: error?.data?.detail || "Failed to create service",
+                                    color: "red",
+                                  });
+                                }
+                              }}
+                              loading={isCreatingService}
+                            >
+                              Save
+                            </Button>
+                          }
+                        />
+                        <Button
+                          variant="light"
+                          size="xs"
+                          onClick={() => {
+                            setIsAddingNewService(false);
+                            setNewServiceName("");
+                            paymentForm.setFieldValue("service_name", "");
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </>
+                    ) : (
+                      <Select
+                        label="Service/Invoice Name"
+                        placeholder="Select a service or add a new one"
+                        description="Choose from existing services or add a new one. Prices can vary per patient for the same service."
+                        required
+                        leftSection={<FileText size={16} />}
+                        data={[
+                          ...(servicesData?.results?.filter((s: any) => s.is_active)?.map((service: any) => ({
+                            value: service.name,
+                            label: service.name,
+                          })) || []),
+                          { value: "__add_new__", label: "+ Add New Service" },
+                        ]}
+                        value={paymentForm.values.service_name}
+                        onChange={(value) => {
+                          if (value === "__add_new__") {
+                            setIsAddingNewService(true);
+                            paymentForm.setFieldValue("service_name", "");
+                          } else {
+                            paymentForm.setFieldValue("service_name", value || "");
+                          }
+                        }}
+                        searchable
+                      />
+                    )}
                     <Group grow>
                       <NumberInput
                         label="Total Invoice Amount"
