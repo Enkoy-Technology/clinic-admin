@@ -45,6 +45,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useCreatePatientMutation, useDeletePatientMutation, useGetPatientsQuery, useUpdatePatientMutation, type CreatePatientRequest } from "../../../shared/api/patientsApi";
+import { useGetInvoicesQuery } from "../../../shared/api/paymentsApi";
 
 const statusColors: Record<string, string> = {
   ACTIVE: "green",
@@ -122,6 +123,12 @@ export default function PatientListPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string | null>("all");
   const [genderFilter, setGenderFilter] = useState<string | null>("all");
+
+  // Fetch invoices for the selected patient in the records modal
+  const { data: patientInvoicesData, isLoading: isLoadingPatientInvoices } = useGetInvoicesQuery(
+    { patient: patientForRecords?.id },
+    { skip: !patientForRecords?.id }
+  );
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage] = useState(10);
   const [selectedPatientIds, setSelectedPatientIds] = useState<number[]>([]);
@@ -1252,9 +1259,26 @@ export default function PatientListPage() {
       >
         {patientForRecords && (() => {
           const fullName = `${patientForRecords.profile?.user?.first_name || ""} ${patientForRecords.profile?.user?.last_name || ""}`.trim() || patientForRecords.name || "N/A";
-          const totalAmount = mockPaymentRecords.reduce((sum, r) => sum + r.amount, 0);
-          const totalPaid = mockPaymentRecords.reduce((sum, r) => sum + r.paid, 0);
+
+          // Use real invoice data
+          const patientInvoices = patientInvoicesData?.results || [];
+          const totalAmount = patientInvoices.reduce(
+            (sum: number, inv: any) => sum + parseFloat(inv.total_amount || "0"),
+            0
+          );
+          const totalPaid = patientInvoices.reduce(
+            (sum: number, inv: any) => sum + parseFloat(inv.paid_amount || "0"),
+            0
+          );
           const totalRemaining = totalAmount - totalPaid;
+
+          if (isLoadingPatientInvoices) {
+            return (
+              <div className="flex justify-center items-center py-16">
+                <Loader size="lg" color="teal" />
+              </div>
+            );
+          }
 
           return (
             <Stack gap="md">
@@ -1298,63 +1322,77 @@ export default function PatientListPage() {
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                  {mockPaymentRecords.map((record) => {
-                    const remaining = record.amount - record.paid;
-                    const progressPercent = record.amount > 0 ? (record.paid / record.amount) * 100 : 0;
-                    return (
-                      <Table.Tr key={record.id}>
-                        <Table.Td>
-                          <Group gap={6}>
-                            <Calendar size={14} className="text-gray-400" />
-                            <Text size="xs">{record.date}</Text>
-                          </Group>
-                        </Table.Td>
-                        <Table.Td>
-                          <Text size="sm" fw={500}>{record.service}</Text>
-                        </Table.Td>
-                        <Table.Td>
-                          <Text size="sm" fw={600}>ETB {record.amount.toLocaleString()}</Text>
-                        </Table.Td>
-                        <Table.Td>
-                          <Text size="sm" className="text-green-600" fw={500}>
-                            ETB {record.paid.toLocaleString()}
-                          </Text>
-                        </Table.Td>
-                        <Table.Td>
-                          <Text
-                            size="sm"
-                            className={remaining > 0 ? "text-red-600" : "text-gray-600"}
-                            fw={500}
-                          >
-                            ETB {remaining.toLocaleString()}
-                          </Text>
-                        </Table.Td>
-                        <Table.Td>
-                          <div style={{ minWidth: 80 }}>
-                            <Progress
-                              value={progressPercent}
-                              color={progressPercent === 100 ? "green" : progressPercent >= 50 ? "blue" : "yellow"}
-                              size="sm"
-                              radius="xl"
-                            />
-                            <Text size="xs" c="dimmed" mt={4} ta="center">
-                              {progressPercent.toFixed(0)}%
+                  {patientInvoices.length === 0 ? (
+                    <Table.Tr>
+                      <Table.Td colSpan={7}>
+                        <Text ta="center" py="xl" c="dimmed">
+                          No payment records found for this patient
+                        </Text>
+                      </Table.Td>
+                    </Table.Tr>
+                  ) : (
+                    patientInvoices.map((invoice: any) => {
+                      const amount = parseFloat(invoice.total_amount || "0");
+                      const paid = parseFloat(invoice.paid_amount || "0");
+                      const remaining = amount - paid;
+                      const progressPercent = amount > 0 ? (paid / amount) * 100 : 0;
+                      const invoiceDate = invoice.created_at ? invoice.created_at.split("T")[0] : "N/A";
+
+                      return (
+                        <Table.Tr key={invoice.id}>
+                          <Table.Td>
+                            <Group gap={6}>
+                              <Calendar size={14} className="text-gray-400" />
+                              <Text size="xs">{invoiceDate}</Text>
+                            </Group>
+                          </Table.Td>
+                          <Table.Td>
+                            <Text size="sm" fw={500}>{invoice.service}</Text>
+                          </Table.Td>
+                          <Table.Td>
+                            <Text size="sm" fw={600}>ETB {amount.toLocaleString()}</Text>
+                          </Table.Td>
+                          <Table.Td>
+                            <Text size="sm" className="text-green-600" fw={500}>
+                              ETB {paid.toLocaleString()}
                             </Text>
-                          </div>
-                        </Table.Td>
-                        <Table.Td>
-                          <Badge
-                            variant="light"
-                            color={paymentStatusColors[record.status]}
-                            size="sm"
-                            className="capitalize"
-                          >
-                            {record.status}
-                          </Badge>
-                        </Table.Td>
-                      </Table.Tr>
-                    );
-                  })}
+                          </Table.Td>
+                          <Table.Td>
+                            <Text
+                              size="sm"
+                              className={remaining > 0 ? "text-red-600" : "text-gray-600"}
+                              fw={500}
+                            >
+                              ETB {remaining.toLocaleString()}
+                            </Text>
+                          </Table.Td>
+                          <Table.Td>
+                            <div style={{ minWidth: 80 }}>
+                              <Progress
+                                value={progressPercent}
+                                color={progressPercent === 100 ? "green" : progressPercent >= 50 ? "blue" : "yellow"}
+                                size="sm"
+                                radius="xl"
+                              />
+                              <Text size="xs" c="dimmed" mt={4} ta="center">
+                                {progressPercent.toFixed(0)}%
+                              </Text>
+                            </div>
+                          </Table.Td>
+                          <Table.Td>
+                            <Badge
+                              variant="light"
+                              color={paymentStatusColors[invoice.status] || "gray"}
+                              size="sm"
+                              className="capitalize"
+                            >
+                              {invoice.status}
+                            </Badge>
+                          </Table.Td>
+                        </Table.Tr>
+                      );
+                    })
+                  )}
                 </Table.Tbody>
               </Table>
 
