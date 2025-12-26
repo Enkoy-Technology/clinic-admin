@@ -236,12 +236,26 @@ export default function PatientDetailPage() {
 
   const handleCreateAppointment = async (values: typeof appointmentForm.values) => {
     try {
-      const scheduledDate = values.scheduled_date.toISOString().split("T")[0];
+      // Ensure we have a valid date
+      const selectedDate = values.scheduled_date instanceof Date
+        ? values.scheduled_date
+        : new Date(values.scheduled_date);
+
+      if (isNaN(selectedDate.getTime())) {
+        notifications.show({
+          title: "Error",
+          message: "Please select a valid date",
+          color: "red",
+        });
+        return;
+      }
+
+      const scheduledDate = selectedDate.toISOString().split("T")[0];
       const time24 = convertTo24Hour(values.start_time);
 
       // Calculate end time (add 30 minutes to start time)
       const [hours, minutes] = time24.split(":");
-      const startDate = new Date(values.scheduled_date);
+      const startDate = new Date(selectedDate);
       startDate.setHours(parseInt(hours || "0"), parseInt(minutes || "0"), 0);
       const endDate = new Date(startDate.getTime() + 30 * 60000);
       const endTime24 = `${endDate.getHours().toString().padStart(2, "0")}:${endDate.getMinutes().toString().padStart(2, "0")}`;
@@ -765,7 +779,11 @@ export default function PatientDetailPage() {
               required
               leftSection={<Calendar size={16} />}
               minDate={new Date()}
-              {...appointmentForm.getInputProps("scheduled_date")}
+              value={appointmentForm.values.scheduled_date}
+              onChange={(date) => {
+                appointmentForm.setFieldValue("scheduled_date", date || new Date());
+              }}
+              error={appointmentForm.errors.scheduled_date}
             />
 
             <Select
