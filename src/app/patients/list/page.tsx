@@ -236,15 +236,16 @@ export default function PatientListPage() {
   };
 
   const handleExportToExcel = async () => {
-    try {
-      notifications.show({
-        title: "Exporting",
-        message: "Preparing patient data for export...",
-        color: "blue",
-        loading: true,
-        autoClose: false,
-      });
+    const loadingNotification = notifications.show({
+      id: "export-loading",
+      title: "Exporting",
+      message: "Preparing patient data for export...",
+      color: "blue",
+      loading: true,
+      autoClose: false,
+    });
 
+    try {
       // Fetch all patients by getting all pages
       let allPatients: any[] = [];
       let currentPageNum = 1;
@@ -329,16 +330,24 @@ export default function PatientListPage() {
       link.click();
       document.body.removeChild(link);
 
-      notifications.show({
+      // Update the loading notification to success
+      notifications.update({
+        id: "export-loading",
         title: "Success",
         message: `Exported ${allPatients.length} patients to Excel`,
         color: "green",
+        loading: false,
+        autoClose: 3000,
       });
     } catch (error: any) {
-      notifications.show({
+      // Update the loading notification to error
+      notifications.update({
+        id: "export-loading",
         title: "Error",
         message: error?.message || "Failed to export patients",
         color: "red",
+        loading: false,
+        autoClose: 5000,
       });
     }
   };
