@@ -13,6 +13,7 @@ import {
   Menu,
   Modal,
   NumberInput,
+  Progress,
   Select,
   Stack,
   Table,
@@ -41,8 +42,8 @@ import {
   Trash2,
   User
 } from "lucide-react";
-import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useCreatePatientMutation, useDeletePatientMutation, useGetPatientsQuery, useUpdatePatientMutation, type CreatePatientRequest } from "../../../shared/api/patientsApi";
 
 const statusColors: Record<string, string> = {
@@ -56,14 +57,68 @@ const statusColors: Record<string, string> = {
   archived: "gray",
 };
 
+// Mock payment records data
+const mockPaymentRecords = [
+  {
+    id: 1,
+    invoiceId: "INV-001",
+    date: "2024-12-15",
+    service: "Root Canal Treatment",
+    amount: 15000,
+    paid: 15000,
+    status: "paid",
+    dentist: "Dr. Hilina",
+    paymentHistory: [
+      { date: "2024-12-15", amount: 15000, method: "Cash" },
+    ],
+  },
+  {
+    id: 2,
+    invoiceId: "INV-002",
+    date: "2024-12-10",
+    service: "Initial Consultation",
+    amount: 2000,
+    paid: 2000,
+    status: "paid",
+    dentist: "Dr. Hilina",
+    paymentHistory: [
+      { date: "2024-12-10", amount: 2000, method: "Bank Transfer" },
+    ],
+  },
+  {
+    id: 3,
+    invoiceId: "INV-003",
+    date: "2024-12-08",
+    service: "Crown Preparation",
+    amount: 12000,
+    paid: 10000,
+    status: "partial",
+    dentist: "Dr. Hilina",
+    paymentHistory: [
+      { date: "2024-12-08", amount: 5000, method: "Cash" },
+      { date: "2024-12-10", amount: 3000, method: "Bank Transfer" },
+      { date: "2024-12-12", amount: 2000, method: "Mobile Money" },
+    ],
+  },
+];
+
+const paymentStatusColors: Record<string, string> = {
+  paid: "green",
+  partial: "yellow",
+  pending: "orange",
+  overdue: "red",
+};
+
 export default function PatientListPage() {
   const router = useRouter();
   const [opened, { open, close }] = useDisclosure(false);
   const [viewModalOpened, { open: openView, close: closeView }] = useDisclosure(false);
+  const [recordsModalOpened, { open: openRecordsModal, close: closeRecordsModal }] = useDisclosure(false);
   const [deleteModalOpened, { open: openDeleteModal, close: closeDeleteModal }] = useDisclosure(false);
   const [bulkDeleteModalOpened, { open: openBulkDeleteModal, close: closeBulkDeleteModal }] = useDisclosure(false);
   const [patientToDelete, setPatientToDelete] = useState<any>(null);
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
+  const [patientForRecords, setPatientForRecords] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string | null>("all");
   const [genderFilter, setGenderFilter] = useState<string | null>("all");
@@ -749,7 +804,10 @@ export default function PatientListPage() {
                             <Menu.Dropdown>
                               <Menu.Item
                                 leftSection={<FileText size={16} />}
-                                onClick={() => router.push(`/patients/records?patientId=${patient.id}`)}
+                                onClick={() => {
+                                  setPatientForRecords(patient);
+                                  openRecordsModal();
+                                }}
                               >
                                 View Records
                               </Menu.Item>
@@ -1170,6 +1228,135 @@ export default function PatientListPage() {
             </Button>
           </Group>
         </Stack>
+      </Modal>
+
+      {/* Payment Records Modal */}
+      <Modal
+        opened={recordsModalOpened}
+        onClose={closeRecordsModal}
+        title={
+          <Text fw={600} size="lg">
+            Payment Records
+          </Text>
+        }
+        size="xl"
+      >
+        {patientForRecords && (() => {
+          const fullName = `${patientForRecords.profile?.user?.first_name || ""} ${patientForRecords.profile?.user?.last_name || ""}`.trim() || patientForRecords.name || "N/A";
+          const totalAmount = mockPaymentRecords.reduce((sum, r) => sum + r.amount, 0);
+          const totalPaid = mockPaymentRecords.reduce((sum, r) => sum + r.paid, 0);
+          const totalRemaining = totalAmount - totalPaid;
+
+          return (
+            <Stack gap="md">
+              <Group>
+                <Avatar src={patientForRecords.profile_picture} size={50} radius="xl" />
+                <div>
+                  <Text size="lg" fw={600}>{fullName}</Text>
+                  <Text size="sm" c="dimmed">Patient ID: #{patientForRecords.id}</Text>
+                </div>
+              </Group>
+
+              {/* Payment Summary */}
+              <div className="grid grid-cols-3 gap-4">
+                <Card shadow="sm" p="md" className="border border-gray-200">
+                  <Text size="xs" c="dimmed" mb={4}>Total Amount</Text>
+                  <Text size="lg" fw={700}>ETB {totalAmount.toLocaleString()}</Text>
+                </Card>
+                <Card shadow="sm" p="md" className="border border-gray-200">
+                  <Text size="xs" c="dimmed" mb={4}>Total Paid</Text>
+                  <Text size="lg" fw={700} className="text-green-600">ETB {totalPaid.toLocaleString()}</Text>
+                </Card>
+                <Card shadow="sm" p="md" className="border border-gray-200">
+                  <Text size="xs" c="dimmed" mb={4}>Remaining</Text>
+                  <Text size="lg" fw={700} className={totalRemaining > 0 ? "text-red-600" : "text-gray-600"}>
+                    ETB {totalRemaining.toLocaleString()}
+                  </Text>
+                </Card>
+              </div>
+
+              {/* Payment Records Table */}
+              <Table highlightOnHover verticalSpacing="md">
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Date</Table.Th>
+                    <Table.Th>Service</Table.Th>
+                    <Table.Th>Amount</Table.Th>
+                    <Table.Th>Paid</Table.Th>
+                    <Table.Th>Remaining</Table.Th>
+                    <Table.Th>Progress</Table.Th>
+                    <Table.Th>Status</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {mockPaymentRecords.map((record) => {
+                    const remaining = record.amount - record.paid;
+                    const progressPercent = record.amount > 0 ? (record.paid / record.amount) * 100 : 0;
+                    return (
+                      <Table.Tr key={record.id}>
+                        <Table.Td>
+                          <Group gap={6}>
+                            <Calendar size={14} className="text-gray-400" />
+                            <Text size="xs">{record.date}</Text>
+                          </Group>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm" fw={500}>{record.service}</Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm" fw={600}>ETB {record.amount.toLocaleString()}</Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm" className="text-green-600" fw={500}>
+                            ETB {record.paid.toLocaleString()}
+                          </Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text
+                            size="sm"
+                            className={remaining > 0 ? "text-red-600" : "text-gray-600"}
+                            fw={500}
+                          >
+                            ETB {remaining.toLocaleString()}
+                          </Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <div style={{ minWidth: 80 }}>
+                            <Progress
+                              value={progressPercent}
+                              color={progressPercent === 100 ? "green" : progressPercent >= 50 ? "blue" : "yellow"}
+                              size="sm"
+                              radius="xl"
+                            />
+                            <Text size="xs" c="dimmed" mt={4} ta="center">
+                              {progressPercent.toFixed(0)}%
+                            </Text>
+                          </div>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge
+                            variant="light"
+                            color={paymentStatusColors[record.status]}
+                            size="sm"
+                            className="capitalize"
+                          >
+                            {record.status}
+                          </Badge>
+                        </Table.Td>
+                      </Table.Tr>
+                    );
+                  })}
+                </Table.Tbody>
+              </Table>
+
+              <Group justify="flex-end" mt="md">
+                <Button variant="light" onClick={closeRecordsModal}>
+                  Close
+                </Button>
+              </Group>
+            </Stack>
+          );
+        })()}
       </Modal>
     </Box>
   );
