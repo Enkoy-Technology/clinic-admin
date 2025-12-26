@@ -8,7 +8,6 @@ import {
   Button,
   Card,
   Group,
-  Menu,
   Modal,
   Progress,
   Select,
@@ -16,32 +15,30 @@ import {
   Table,
   Text,
   TextInput,
-  Title
+  Title,
 } from "@mantine/core";
-import { DatePickerInput } from "@mantine/dates";
 import { useDisclosure } from "@mantine/hooks";
 import {
   Calendar,
   CheckCircle2,
   Clock,
-  CreditCard,
   DollarSign,
   Download,
   Eye,
   FileText,
-  MoreVertical,
+  Plus,
   Search,
-  TrendingUp,
-  X
+  User,
 } from "lucide-react";
-import { useSearchParams } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { useGetPatientsQuery } from "../../../shared/api/patientsApi";
 
-// Mock payment records data
+// Mock payment records data - each record is tied to a patient
 const mockPaymentRecords = [
   {
     id: 1,
+    patientId: 1, // Patient ID this record belongs to
     invoiceId: "INV-001",
     date: "2024-12-15",
     service: "Root Canal Treatment",
@@ -51,12 +48,11 @@ const mockPaymentRecords = [
     status: "paid",
     dentist: "Dr. Hilina",
     notes: "Full payment received",
-    paymentHistory: [
-      { date: "2024-12-15", amount: 15000, method: "Cash" },
-    ],
+    paymentHistory: [{ date: "2024-12-15", amount: 15000, method: "Cash" }],
   },
   {
     id: 2,
+    patientId: 1, // Same patient
     invoiceId: "INV-002",
     date: "2024-12-10",
     service: "Initial Consultation",
@@ -72,6 +68,7 @@ const mockPaymentRecords = [
   },
   {
     id: 3,
+    patientId: 1, // Same patient
     invoiceId: "INV-003",
     date: "2024-12-08",
     service: "Crown Preparation",
@@ -89,6 +86,7 @@ const mockPaymentRecords = [
   },
   {
     id: 4,
+    patientId: 2, // Different patient
     invoiceId: "INV-004",
     date: "2024-11-20",
     service: "Teeth Cleaning",
@@ -120,35 +118,97 @@ const paymentMethodColors: Record<string, string> = {
 };
 
 export default function PatientRecordsPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const patientIdParam = searchParams.get("patientId");
 
-  const [viewModalOpened, { open: openView, close: closeView }] = useDisclosure(false);
+  const [viewModalOpened, { open: openView, close: closeView }] =
+    useDisclosure(false);
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string | null>("all");
-  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(patientIdParam);
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(
+    patientIdParam
+  );
 
   // Fetch patients for dropdown
-  const { data: patientsData } = useGetPatientsQuery({ page: 1, per_page: 100 });
+  const { data: patientsData } = useGetPatientsQuery({
+    page: 1,
+    per_page: 100,
+  });
 
   // Get selected patient info
-  const selectedPatient = patientsData?.results?.find((p: any) => p.id.toString() === selectedPatientId);
+  const selectedPatient = patientsData?.results?.find(
+    (p: any) => p.id.toString() === selectedPatientId
+  );
 
-  // Filter payment records (in real app, this would come from API)
-  const filteredRecords = mockPaymentRecords.filter((record) => {
+  // Aggregate payment records by patient (in real app, this would come from API)
+  // Group all invoices/payments by patient and calculate totals
+  const patientPaymentData =
+    patientsData?.results?.map((patient: any) => {
+      // Get all payment records for this patient
+      const patientRecords = mockPaymentRecords.filter(
+        (record) => record.patientId?.toString() === patient.id.toString()
+      );
+
+      const totalAmount = patientRecords.reduce((sum, r) => sum + r.amount, 0);
+      const totalPaid = patientRecords.reduce((sum, r) => sum + r.paid, 0);
+      const totalRemaining = totalAmount - totalPaid;
+      const progressPercent =
+        totalAmount > 0 ? (totalPaid / totalAmount) * 100 : 0;
+
+      // Determine overall status
+      let overallStatus = "pending";
+      if (totalPaid === 0) {
+        overallStatus = "pending";
+      } else if (totalPaid >= totalAmount) {
+        overallStatus = "paid";
+      } else {
+        overallStatus = "partial";
+      }
+
+      return {
+        patientId: patient.id,
+        patient: patient,
+        totalAmount,
+        totalPaid,
+        totalRemaining,
+        progressPercent,
+        status: overallStatus,
+        invoiceCount: patientRecords.length,
+        records: patientRecords, // Keep individual records for detail view
+      };
+    }) || [];
+
+  // Filter by selected patient if provided
+  let filteredPatientData = patientPaymentData;
+  if (selectedPatientId) {
+    filteredPatientData = patientPaymentData.filter(
+      (data) => data.patientId.toString() === selectedPatientId
+    );
+  }
+
+  // Apply search filter
+  const searchFiltered = filteredPatientData.filter((data) => {
+    const patientName =
+      `${data.patient.profile?.user?.first_name || ""} ${data.patient.profile?.user?.last_name || ""}`
+        .trim()
+        .toLowerCase();
+    const patientId = data.patientId.toString();
     const matchesSearch =
-      record.invoiceId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      record.service.toLowerCase().includes(searchQuery.toLowerCase());
+      !searchQuery ||
+      patientName.includes(searchQuery.toLowerCase()) ||
+      patientId.includes(searchQuery.toLowerCase());
 
-    const matchesStatus = statusFilter === "all" || record.status === statusFilter;
+    const matchesStatus =
+      statusFilter === "all" || data.status === statusFilter;
 
     return matchesSearch && matchesStatus;
   });
 
-  // Calculate payment statistics
-  const totalAmount = filteredRecords.reduce((sum, r) => sum + r.amount, 0);
-  const totalPaid = filteredRecords.reduce((sum, r) => sum + r.paid, 0);
+  // Calculate overall statistics
+  const totalAmount = searchFiltered.reduce((sum, p) => sum + p.totalAmount, 0);
+  const totalPaid = searchFiltered.reduce((sum, p) => sum + p.totalPaid, 0);
   const totalRemaining = totalAmount - totalPaid;
   const paymentProgress = totalAmount > 0 ? (totalPaid / totalAmount) * 100 : 0;
 
@@ -168,19 +228,48 @@ export default function PatientRecordsPage() {
       {/* Header */}
       <Group justify="space-between" mb="xl">
         <div>
-          <Title order={2} className="text-gray-800">Payment Records</Title>
+          <Title order={2} className="text-gray-800">
+            Payment Records
+          </Title>
           <Text size="sm" c="dimmed">
             {selectedPatient
               ? `Payment history for ${selectedPatient.profile?.user?.first_name || ""} ${selectedPatient.profile?.user?.last_name || ""}`
-              : "View patient payment history and billing information"
-            }
+              : "View patient payment history and billing information"}
           </Text>
+          {selectedPatient && (
+            <Group gap="xs" mt={4}>
+              <User size={14} className="text-gray-400" />
+              <Text size="xs" c="dimmed">
+                Patient ID: #{selectedPatient.id}
+              </Text>
+              {selectedPatient.profile?.phone_number && (
+                <>
+                  <Text size="xs" c="dimmed">
+                    •
+                  </Text>
+                  <Text size="xs" c="dimmed">
+                    Phone: {selectedPatient.profile.phone_number}
+                  </Text>
+                </>
+              )}
+            </Group>
+          )}
         </div>
         <Group>
-          <Button
-            leftSection={<Download size={18} />}
-            variant="light"
-          >
+          {selectedPatient && (
+            <Button
+              leftSection={<Plus size={18} />}
+              className="bg-[#19b5af] hover:bg-[#14918c]"
+              onClick={() =>
+                router.push(
+                  `/patients/payments/add?patientId=${selectedPatient.id}`
+                )
+              }
+            >
+              Add Payment
+            </Button>
+          )}
+          <Button leftSection={<Download size={18} />} variant="light">
             Export
           </Button>
         </Group>
@@ -190,35 +279,44 @@ export default function PatientRecordsPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         {[
           {
-            label: "Total Invoices",
-            value: filteredRecords.length.toString(),
+            label: "Total Patients",
+            value: searchFiltered.length.toString(),
             icon: FileText,
-            color: "bg-blue-500"
+            color: "bg-blue-500",
           },
           {
             label: "Total Amount",
             value: `ETB ${totalAmount.toLocaleString()}`,
             icon: DollarSign,
-            color: "bg-purple-500"
+            color: "bg-purple-500",
           },
           {
             label: "Total Paid",
             value: `ETB ${totalPaid.toLocaleString()}`,
             icon: CheckCircle2,
-            color: "bg-green-500"
+            color: "bg-green-500",
           },
           {
             label: "Remaining",
             value: `ETB ${totalRemaining.toLocaleString()}`,
             icon: Clock,
-            color: totalRemaining > 0 ? "bg-red-500" : "bg-gray-500"
+            color: totalRemaining > 0 ? "bg-red-500" : "bg-gray-500",
           },
         ].map((stat, index) => (
-          <Card key={index} shadow="sm" p="md" className="border border-gray-200">
+          <Card
+            key={index}
+            shadow="sm"
+            p="md"
+            className="border border-gray-200"
+          >
             <Group justify="space-between">
               <div>
-                <Text size="sm" c="dimmed" mb={4}>{stat.label}</Text>
-                <Text size="xl" fw={700}>{stat.value}</Text>
+                <Text size="sm" c="dimmed" mb={4}>
+                  {stat.label}
+                </Text>
+                <Text size="xl" fw={700}>
+                  {stat.value}
+                </Text>
               </div>
               <div className={`${stat.color} p-3 rounded-lg`}>
                 <stat.icon size={24} className="text-white" />
@@ -232,7 +330,7 @@ export default function PatientRecordsPage() {
       <Card shadow="sm" p="md" mb="md" className="border border-gray-200">
         <Group>
           <TextInput
-            placeholder="Search by service..."
+            placeholder="Search by patient name or ID..."
             leftSection={<Search size={16} />}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.currentTarget.value)}
@@ -260,18 +358,18 @@ export default function PatientRecordsPage() {
         <Table highlightOnHover verticalSpacing="md">
           <Table.Thead>
             <Table.Tr>
-              <Table.Th>Date</Table.Th>
-              <Table.Th>Service</Table.Th>
-              <Table.Th>Amount</Table.Th>
-              <Table.Th>Paid</Table.Th>
+              <Table.Th>Patient Name</Table.Th>
+              <Table.Th>Total Amount</Table.Th>
+              <Table.Th>Total Paid</Table.Th>
               <Table.Th>Remaining</Table.Th>
               <Table.Th>Progress</Table.Th>
+              <Table.Th>Invoices</Table.Th>
               <Table.Th>Status</Table.Th>
               <Table.Th>Actions</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
-            {filteredRecords.length === 0 ? (
+            {searchFiltered.length === 0 ? (
               <Table.Tr>
                 <Table.Td colSpan={8}>
                   <Text ta="center" py="xl" c="dimmed">
@@ -280,58 +378,90 @@ export default function PatientRecordsPage() {
                 </Table.Td>
               </Table.Tr>
             ) : (
-              filteredRecords.map((record) => {
-                const remaining = record.amount - record.paid;
-                const progressPercent = record.amount > 0 ? (record.paid / record.amount) * 100 : 0;
+              searchFiltered.map((patientData) => {
+                const patientName =
+                  `${patientData.patient.profile?.user?.first_name || ""} ${patientData.patient.profile?.user?.last_name || ""}`.trim() ||
+                  patientData.patient.name ||
+                  "N/A";
                 return (
-                  <Table.Tr key={record.id}>
+                  <Table.Tr key={patientData.patientId}>
                     <Table.Td>
-                      <Group gap={6}>
-                        <Calendar size={14} className="text-gray-400" />
-                        <Text size="xs">{record.date}</Text>
+                      <Group gap="xs">
+                        <Avatar
+                          src={patientData.patient.profile_picture}
+                          size={40}
+                          radius="xl"
+                        />
+                        <div>
+                          <Text size="sm" fw={500}>
+                            {patientName}
+                          </Text>
+                          <Text size="xs" c="dimmed">
+                            ID: #{patientData.patientId}
+                          </Text>
+                          {patientData.patient.profile?.phone_number && (
+                            <Text size="xs" c="dimmed">
+                              {patientData.patient.profile.phone_number}
+                            </Text>
+                          )}
+                        </div>
                       </Group>
                     </Table.Td>
                     <Table.Td>
-                      <Text size="sm" fw={500}>{record.service}</Text>
-                    </Table.Td>
-                    <Table.Td>
-                      <Text size="sm" fw={600}>ETB {record.amount.toLocaleString()}</Text>
+                      <Text size="sm" fw={600}>
+                        ETB {patientData.totalAmount.toLocaleString()}
+                      </Text>
                     </Table.Td>
                     <Table.Td>
                       <Text size="sm" className="text-green-600" fw={500}>
-                        ETB {record.paid.toLocaleString()}
+                        ETB {patientData.totalPaid.toLocaleString()}
                       </Text>
                     </Table.Td>
                     <Table.Td>
                       <Text
                         size="sm"
-                        className={remaining > 0 ? "text-red-600" : "text-gray-600"}
+                        className={
+                          patientData.totalRemaining > 0
+                            ? "text-red-600"
+                            : "text-gray-600"
+                        }
                         fw={500}
                       >
-                        ETB {remaining.toLocaleString()}
+                        ETB {patientData.totalRemaining.toLocaleString()}
                       </Text>
                     </Table.Td>
                     <Table.Td>
                       <div style={{ minWidth: 100 }}>
                         <Progress
-                          value={progressPercent}
-                          color={progressPercent === 100 ? "green" : progressPercent >= 50 ? "blue" : "yellow"}
+                          value={patientData.progressPercent}
+                          color={
+                            patientData.progressPercent === 100
+                              ? "green"
+                              : patientData.progressPercent >= 50
+                                ? "blue"
+                                : "yellow"
+                          }
                           size="sm"
                           radius="xl"
                         />
                         <Text size="xs" c="dimmed" mt={4} ta="center">
-                          {progressPercent.toFixed(0)}%
+                          {patientData.progressPercent.toFixed(0)}%
                         </Text>
                       </div>
                     </Table.Td>
                     <Table.Td>
+                      <Badge variant="light" color="blue" size="sm">
+                        {patientData.invoiceCount} invoice(s)
+                      </Badge>
+                    </Table.Td>
+                    <Table.Td>
                       <Badge
                         variant="light"
-                        color={paymentStatusColors[record.status]}
+                        color={paymentStatusColors[patientData.status]}
                         size="sm"
                         className="capitalize"
                       >
-                        {record.status}
+                        {patientData.status}
                       </Badge>
                     </Table.Td>
                     <Table.Td>
@@ -339,25 +469,31 @@ export default function PatientRecordsPage() {
                         <ActionIcon
                           variant="light"
                           color="blue"
-                          onClick={() => handleViewRecord(record)}
+                          onClick={() => {
+                            setSelectedRecord({
+                              patient: patientData.patient,
+                              records: patientData.records,
+                              totalAmount: patientData.totalAmount,
+                              totalPaid: patientData.totalPaid,
+                              totalRemaining: patientData.totalRemaining,
+                              status: patientData.status,
+                            });
+                            openView();
+                          }}
                         >
                           <Eye size={16} />
                         </ActionIcon>
-                        <Menu shadow="md" width={200}>
-                          <Menu.Target>
-                            <ActionIcon variant="light" color="gray">
-                              <MoreVertical size={16} />
-                            </ActionIcon>
-                          </Menu.Target>
-                          <Menu.Dropdown>
-                            <Menu.Item leftSection={<Download size={16} />}>
-                              Download Invoice
-                            </Menu.Item>
-                            <Menu.Item leftSection={<FileText size={16} />}>
-                              View Details
-                            </Menu.Item>
-                          </Menu.Dropdown>
-                        </Menu>
+                        <Button
+                          variant="light"
+                          size="xs"
+                          onClick={() =>
+                            router.push(
+                              `/patients/payments/add?patientId=${patientData.patientId}`
+                            )
+                          }
+                        >
+                          Add Payment
+                        </Button>
                       </Group>
                     </Table.Td>
                   </Table.Tr>
@@ -368,122 +504,214 @@ export default function PatientRecordsPage() {
         </Table>
       </Card>
 
-      {/* View Payment Record Modal */}
+      {/* View Patient Payment Details Modal */}
       <Modal
         opened={viewModalOpened}
         onClose={closeView}
         title={
           <Text fw={600} size="lg">
-            Payment Record Details
+            Patient Payment Details
           </Text>
         }
-        size="lg"
+        size="xl"
       >
-        {selectedRecord && (
+        {selectedRecord && selectedRecord.patient && (
           <Stack gap="md">
-            <Group justify="space-between">
+            {/* Patient Info */}
+            <Group>
+              <Avatar
+                src={selectedRecord.patient.profile_picture}
+                size={60}
+                radius="xl"
+              />
               <div>
-                <Text size="lg" fw={600}>{selectedRecord.service}</Text>
-                <Badge variant="light" color="gray" mt={4}>
-                  {selectedRecord.invoiceId}
-                </Badge>
+                <Text size="lg" fw={600}>
+                  {selectedRecord.patient.profile?.user?.first_name || ""}{" "}
+                  {selectedRecord.patient.profile?.user?.last_name || ""}
+                </Text>
+                <Text size="sm" c="dimmed">
+                  Patient ID: #{selectedRecord.patient.id}
+                </Text>
+                {selectedRecord.patient.profile?.phone_number && (
+                  <Text size="sm" c="dimmed">
+                    Phone: {selectedRecord.patient.profile.phone_number}
+                  </Text>
+                )}
               </div>
               <Badge
                 variant="light"
                 color={paymentStatusColors[selectedRecord.status]}
                 size="lg"
                 className="capitalize"
+                ml="auto"
               >
                 {selectedRecord.status}
               </Badge>
             </Group>
 
+            {/* Payment Summary */}
             <Card className="bg-gray-50">
-              <Group grow>
+              <Text size="sm" fw={600} mb={8}>
+                Payment Summary
+              </Text>
+              <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <Text size="xs" c="dimmed" mb={4}>Payment Date</Text>
-                  <Group gap={6}>
-                    <Calendar size={16} className="text-gray-400" />
-                    <Text size="sm" fw={500}>{selectedRecord.date}</Text>
-                  </Group>
+                  <Text size="xs" c="dimmed" mb={4}>
+                    Total Amount
+                  </Text>
+                  <Text size="lg" fw={700}>
+                    ETB {selectedRecord.totalAmount.toLocaleString()}
+                  </Text>
                 </div>
                 <div>
-                  <Text size="xs" c="dimmed" mb={4}>Dentist</Text>
-                  <Text size="sm" fw={500}>{selectedRecord.dentist}</Text>
+                  <Text size="xs" c="dimmed" mb={4}>
+                    Total Paid
+                  </Text>
+                  <Text size="lg" fw={700} className="text-green-600">
+                    ETB {selectedRecord.totalPaid.toLocaleString()}
+                  </Text>
                 </div>
-              </Group>
+                <div>
+                  <Text size="xs" c="dimmed" mb={4}>
+                    Remaining
+                  </Text>
+                  <Text
+                    size="lg"
+                    fw={700}
+                    className={
+                      selectedRecord.totalRemaining > 0
+                        ? "text-red-600"
+                        : "text-gray-600"
+                    }
+                  >
+                    ETB {selectedRecord.totalRemaining.toLocaleString()}
+                  </Text>
+                </div>
+              </div>
+              <Progress
+                value={
+                  (selectedRecord.totalPaid / selectedRecord.totalAmount) * 100
+                }
+                color={
+                  selectedRecord.totalPaid === selectedRecord.totalAmount
+                    ? "green"
+                    : "yellow"
+                }
+                size="md"
+                radius="xl"
+                mt={12}
+              />
             </Card>
 
-            <div>
-              <Text size="sm" fw={600} mb={8}>Payment Breakdown</Text>
-              <Stack gap={8}>
-                <Group justify="space-between">
-                  <Text size="sm" c="dimmed">Total Amount:</Text>
-                  <Text size="sm" fw={600}>ETB {selectedRecord.amount.toLocaleString()}</Text>
-                </Group>
-                <Group justify="space-between">
-                  <Text size="sm" c="dimmed">Amount Paid:</Text>
-                  <Text size="sm" fw={600} className="text-green-600">
-                    ETB {selectedRecord.paid.toLocaleString()}
-                  </Text>
-                </Group>
-                <Group justify="space-between">
-                  <Text size="sm" c="dimmed">Remaining:</Text>
-                  <Text
-                    size="sm"
-                    fw={600}
-                    className={selectedRecord.amount - selectedRecord.paid > 0 ? "text-red-600" : "text-gray-600"}
-                  >
-                    ETB {(selectedRecord.amount - selectedRecord.paid).toLocaleString()}
-                  </Text>
-                </Group>
-                <Progress
-                  value={(selectedRecord.paid / selectedRecord.amount) * 100}
-                  color={selectedRecord.paid === selectedRecord.amount ? "green" : "yellow"}
-                  size="md"
-                  radius="xl"
-                  mt={8}
-                />
-              </Stack>
-            </div>
-
-            {/* Payment History */}
-            {selectedRecord.paymentHistory && selectedRecord.paymentHistory.length > 0 && (
+            {/* Invoices List */}
+            {selectedRecord.records && selectedRecord.records.length > 0 && (
               <div>
-                <Text size="sm" fw={600} mb={8}>Payment History</Text>
+                <Text size="sm" fw={600} mb={8}>
+                  Invoices & Services
+                </Text>
                 <Stack gap={8}>
-                  {selectedRecord.paymentHistory.map((payment: any, index: number) => (
-                    <Card key={index} className="bg-gray-50 border border-gray-200">
-                      <Group justify="space-between">
-                        <Group gap={8}>
-                          <Calendar size={16} className="text-gray-400" />
-                          <div>
-                            <Text size="sm" fw={500}>{payment.date}</Text>
-                            <Text size="xs" c="dimmed">{payment.method}</Text>
-                          </div>
-                        </Group>
-                        <Text size="sm" fw={600} className="text-green-600">
-                          ETB {payment.amount.toLocaleString()}
-                        </Text>
+                  {selectedRecord.records.map((invoice: any) => (
+                    <Card key={invoice.id} className="border border-gray-200">
+                      <Group justify="space-between" mb={8}>
+                        <div>
+                          <Text size="sm" fw={600}>
+                            {invoice.service}
+                          </Text>
+                          <Text size="xs" c="dimmed">
+                            {invoice.invoiceId}
+                          </Text>
+                        </div>
+                        <Badge
+                          variant="light"
+                          color={paymentStatusColors[invoice.status]}
+                          size="sm"
+                          className="capitalize"
+                        >
+                          {invoice.status}
+                        </Badge>
                       </Group>
+                      <div className="grid grid-cols-3 gap-4 mb={8}">
+                        <div>
+                          <Text size="xs" c="dimmed">
+                            Amount
+                          </Text>
+                          <Text size="sm" fw={500}>
+                            ETB {invoice.amount.toLocaleString()}
+                          </Text>
+                        </div>
+                        <div>
+                          <Text size="xs" c="dimmed">
+                            Paid
+                          </Text>
+                          <Text size="sm" fw={500} className="text-green-600">
+                            ETB {invoice.paid.toLocaleString()}
+                          </Text>
+                        </div>
+                        <div>
+                          <Text size="xs" c="dimmed">
+                            Remaining
+                          </Text>
+                          <Text size="sm" fw={500} className="text-red-600">
+                            ETB{" "}
+                            {(invoice.amount - invoice.paid).toLocaleString()}
+                          </Text>
+                        </div>
+                      </div>
+                      {invoice.paymentHistory &&
+                        invoice.paymentHistory.length > 0 && (
+                          <div>
+                            <Text size="xs" c="dimmed" mb={4}>
+                              Payment History:
+                            </Text>
+                            <Stack gap={4}>
+                              {invoice.paymentHistory.map(
+                                (payment: any, idx: number) => (
+                                  <Group
+                                    key={idx}
+                                    justify="space-between"
+                                    gap="xs"
+                                  >
+                                    <Group gap={4}>
+                                      <Calendar
+                                        size={12}
+                                        className="text-gray-400"
+                                      />
+                                      <Text size="xs">{payment.date}</Text>
+                                      <Text size="xs" c="dimmed">
+                                        • {payment.method}
+                                      </Text>
+                                    </Group>
+                                    <Text
+                                      size="xs"
+                                      fw={500}
+                                      className="text-green-600"
+                                    >
+                                      ETB {payment.amount.toLocaleString()}
+                                    </Text>
+                                  </Group>
+                                )
+                              )}
+                            </Stack>
+                          </div>
+                        )}
                     </Card>
                   ))}
                 </Stack>
               </div>
             )}
 
-            {selectedRecord.notes && (
-              <div>
-                <Text size="sm" fw={600} mb={4}>Notes</Text>
-                <Card className="bg-gray-50">
-                  <Text size="sm">{selectedRecord.notes}</Text>
-                </Card>
-              </div>
-            )}
-
             <Group justify="flex-end" mt="md">
-              <Button variant="light" leftSection={<Download size={16} />}>
-                Download Invoice
+              <Button
+                variant="light"
+                onClick={() => {
+                  closeView();
+                  router.push(
+                    `/patients/payments/add?patientId=${selectedRecord.patient.id}`
+                  );
+                }}
+                leftSection={<Plus size={16} />}
+              >
+                Add Payment
               </Button>
               <Button variant="light" onClick={closeView}>
                 Close

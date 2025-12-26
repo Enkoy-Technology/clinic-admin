@@ -1358,7 +1358,17 @@ export default function PatientListPage() {
                 </Table.Tbody>
               </Table>
 
-              <Group justify="flex-end" mt="md">
+              <Group justify="space-between" mt="md">
+                <Button
+                  leftSection={<Plus size={16} />}
+                  className="bg-[#19b5af] hover:bg-[#14918c]"
+                  onClick={() => {
+                    router.push(`/patients/payments/add?patientId=${patientForRecords.id}`);
+                    closeRecordsModal();
+                  }}
+                >
+                  Add Payment
+                </Button>
                 <Button variant="light" onClick={closeRecordsModal}>
                   Close
                 </Button>
@@ -1367,6 +1377,7 @@ export default function PatientListPage() {
           );
         })()}
       </Modal>
+
     </Box>
   );
 }

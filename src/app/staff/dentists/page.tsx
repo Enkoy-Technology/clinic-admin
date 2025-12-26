@@ -1,42 +1,42 @@
 "use client";
 
 import {
-  ActionIcon,
-  Avatar,
-  Badge,
-  Box,
-  Button,
-  Card,
-  Group,
+    ActionIcon,
+    Avatar,
+    Badge,
+    Box,
+    Button,
+    Card,
+    Group,
   Loader,
-  Menu,
-  Modal,
+    Menu,
+    Modal,
   NumberInput,
-  Select,
-  Stack,
+    Select,
+    Stack,
   Switch,
-  Table,
-  Tabs,
-  Text,
+    Table,
+    Tabs,
+    Text,
   Textarea,
-  TextInput,
-  Title
+    TextInput,
+    Title
 } from "@mantine/core";
 import { DatePickerInput } from "@mantine/dates";
 import { useForm } from "@mantine/form";
 import { useDisclosure } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import {
-  Award,
-  Calendar,
-  Edit,
-  Eye,
-  Mail,
-  MoreVertical,
-  Phone,
-  Plus,
-  Search,
-  Trash2,
+    Award,
+    Calendar,
+    Edit,
+    Eye,
+    Mail,
+    MoreVertical,
+    Phone,
+    Plus,
+    Search,
+    Trash2,
   User
 } from "lucide-react";
 import { useState } from "react";
@@ -285,36 +285,36 @@ export default function DentistsPage() {
             <Loader size="lg" color="teal" />
           </div>
         ) : (
-          <Table highlightOnHover verticalSpacing="md">
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Dentist</Table.Th>
+        <Table highlightOnHover verticalSpacing="md">
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>Dentist</Table.Th>
                 <Table.Th>Specialty</Table.Th>
                 <Table.Th>Qualification</Table.Th>
-                <Table.Th>Contact</Table.Th>
-                <Table.Th>Experience</Table.Th>
-                <Table.Th>Status</Table.Th>
-                <Table.Th>Actions</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {filteredDentists.length === 0 ? (
-                <Table.Tr>
+              <Table.Th>Contact</Table.Th>
+              <Table.Th>Experience</Table.Th>
+              <Table.Th>Status</Table.Th>
+              <Table.Th>Actions</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {filteredDentists.length === 0 ? (
+              <Table.Tr>
                   <Table.Td colSpan={7}>
-                    <Text ta="center" py="xl" c="dimmed">
-                      No dentists found
-                    </Text>
-                  </Table.Td>
-                </Table.Tr>
-              ) : (
+                  <Text ta="center" py="xl" c="dimmed">
+                    No dentists found
+                  </Text>
+                </Table.Td>
+              </Table.Tr>
+            ) : (
                 filteredDentists.map((dentist) => {
                   const fullName = `${dentist.profile?.user?.first_name || ""} ${dentist.profile?.user?.last_name || ""}`.trim() || dentist.name || "N/A";
                   return (
-                    <Table.Tr key={dentist.id}>
-                      <Table.Td>
-                        <Group gap="xs">
+                <Table.Tr key={dentist.id}>
+                  <Table.Td>
+                    <Group gap="xs">
                           <Avatar src={dentist.profile_picture} size={50} radius="xl" />
-                          <div>
+                      <div>
                             <Text size="sm" fw={600}>{fullName}</Text>
                             <Text size="xs" c="dimmed">{dentist.profile?.role || "DENTIST"}</Text>
                           </div>
@@ -322,74 +322,74 @@ export default function DentistsPage() {
                       </Table.Td>
                       <Table.Td>
                         <Text size="sm">{dentist.specialty || "N/A"}</Text>
-                      </Table.Td>
-                      <Table.Td>
+                  </Table.Td>
+                  <Table.Td>
                         <Text size="sm">{dentist.qualification || "N/A"}</Text>
-                      </Table.Td>
-                      <Table.Td>
-                        <Stack gap={4}>
-                          <Group gap={6}>
-                            <Phone size={14} className="text-gray-400" />
+                  </Table.Td>
+                  <Table.Td>
+                    <Stack gap={4}>
+                      <Group gap={6}>
+                        <Phone size={14} className="text-gray-400" />
                             <Text size="xs">{dentist.profile?.phone_number || "N/A"}</Text>
-                          </Group>
+                      </Group>
                           {dentist.profile?.user?.email && (
-                            <Group gap={6}>
-                              <Mail size={14} className="text-gray-400" />
+                      <Group gap={6}>
+                        <Mail size={14} className="text-gray-400" />
                               <Text size="xs">{dentist.profile.user.email}</Text>
-                            </Group>
+                      </Group>
                           )}
-                        </Stack>
-                      </Table.Td>
-                      <Table.Td>
+                    </Stack>
+                  </Table.Td>
+                  <Table.Td>
                         <Text size="sm">
                           {dentist.years_of_experience ? `${dentist.years_of_experience} years` : "N/A"}
                         </Text>
-                      </Table.Td>
-                      <Table.Td>
-                        <Badge
-                          variant="light"
+                  </Table.Td>
+                  <Table.Td>
+                    <Badge
+                      variant="light"
                           color={dentist.is_licensed ? "green" : "gray"}
-                          size="sm"
-                        >
+                      size="sm"
+                    >
                           {dentist.is_licensed ? "Licensed" : "Not Licensed"}
-                        </Badge>
-                      </Table.Td>
-                      <Table.Td>
-                        <Group gap="xs">
-                          <ActionIcon
-                            variant="light"
-                            color="blue"
-                            onClick={() => handleViewDentist(dentist)}
-                          >
-                            <Eye size={16} />
+                    </Badge>
+                  </Table.Td>
+                  <Table.Td>
+                    <Group gap="xs">
+                      <ActionIcon
+                        variant="light"
+                        color="blue"
+                        onClick={() => handleViewDentist(dentist)}
+                      >
+                        <Eye size={16} />
+                      </ActionIcon>
+                      <ActionIcon
+                        variant="light"
+                        color="teal"
+                        onClick={() => handleEditDentist(dentist)}
+                      >
+                        <Edit size={16} />
+                      </ActionIcon>
+                      <Menu shadow="md" width={200}>
+                        <Menu.Target>
+                          <ActionIcon variant="light" color="gray">
+                            <MoreVertical size={16} />
                           </ActionIcon>
-                          <ActionIcon
-                            variant="light"
-                            color="teal"
-                            onClick={() => handleEditDentist(dentist)}
-                          >
-                            <Edit size={16} />
-                          </ActionIcon>
-                          <Menu shadow="md" width={200}>
-                            <Menu.Target>
-                              <ActionIcon variant="light" color="gray">
-                                <MoreVertical size={16} />
-                              </ActionIcon>
-                            </Menu.Target>
-                            <Menu.Dropdown>
-                              <Menu.Item leftSection={<Trash2 size={16} />} color="red">
-                                Remove
-                              </Menu.Item>
-                            </Menu.Dropdown>
-                          </Menu>
-                        </Group>
-                      </Table.Td>
-                    </Table.Tr>
+                        </Menu.Target>
+                        <Menu.Dropdown>
+                          <Menu.Item leftSection={<Trash2 size={16} />} color="red">
+                            Remove
+                          </Menu.Item>
+                        </Menu.Dropdown>
+                      </Menu>
+                    </Group>
+                  </Table.Td>
+                </Table.Tr>
                   );
                 })
-              )}
-            </Table.Tbody>
-          </Table>
+            )}
+          </Table.Tbody>
+        </Table>
         )}
         {/* Pagination */}
         {doctorsData && doctorsData.total_pages > 1 && (
@@ -437,20 +437,20 @@ export default function DentistsPage() {
       >
         <form onSubmit={form.onSubmit(handleSubmit)}>
           <Tabs defaultValue="basic">
-            <Tabs.List>
+          <Tabs.List>
               <Tabs.Tab value="basic" leftSection={<User size={16} />}>
                 Basic Info
-              </Tabs.Tab>
-              <Tabs.Tab value="professional" leftSection={<Award size={16} />}>
-                Professional
-              </Tabs.Tab>
+            </Tabs.Tab>
+            <Tabs.Tab value="professional" leftSection={<Award size={16} />}>
+              Professional
+            </Tabs.Tab>
               <Tabs.Tab value="address" leftSection={<Calendar size={16} />}>
                 Address
-              </Tabs.Tab>
-            </Tabs.List>
+            </Tabs.Tab>
+          </Tabs.List>
 
             <Tabs.Panel value="basic" pt="md">
-              <Stack gap="md">
+            <Stack gap="md">
                 <Group grow>
                   <TextInput
                     label="First Name"
@@ -459,13 +459,13 @@ export default function DentistsPage() {
                     leftSection={<User size={16} />}
                     {...form.getInputProps("first_name")}
                   />
-                  <TextInput
+              <TextInput
                     label="Last Name"
                     placeholder="Doe"
-                    required
-                    leftSection={<User size={16} />}
+                required
+                leftSection={<User size={16} />}
                     {...form.getInputProps("last_name")}
-                  />
+              />
                 </Group>
 
                 <TextInput
@@ -493,23 +493,23 @@ export default function DentistsPage() {
                       { value: "ASSISTANT", label: "Assistant" },
                     ]}
                     {...form.getInputProps("role")}
-                  />
+                />
                   <Select
                     label="Gender"
                     placeholder="Select gender"
-                    required
+                  required
                     data={[
                       { value: "MALE", label: "Male" },
                       { value: "FEMALE", label: "Female" },
                     ]}
                     {...form.getInputProps("gender")}
-                  />
-                </Group>
+                />
+              </Group>
 
-                <DatePickerInput
+              <DatePickerInput
                   label="Date of Birth (Optional)"
-                  placeholder="Select date"
-                  leftSection={<Calendar size={16} />}
+                placeholder="Select date"
+                leftSection={<Calendar size={16} />}
                   value={form.values.dob}
                   onChange={(date) => form.setFieldValue("dob", date)}
                 />
@@ -517,21 +517,21 @@ export default function DentistsPage() {
                 <Switch
                   label="Is Licensed"
                   {...form.getInputProps("is_licensed", { type: "checkbox" })}
-                />
-              </Stack>
-            </Tabs.Panel>
+              />
+            </Stack>
+          </Tabs.Panel>
 
-            <Tabs.Panel value="professional" pt="md">
-              <Stack gap="md">
-                <TextInput
+          <Tabs.Panel value="professional" pt="md">
+            <Stack gap="md">
+              <TextInput
                   label="Qualification"
                   placeholder="e.g., DDS, PhD Dental Surgery"
-                  required
+                required
                   leftSection={<Award size={16} />}
                   {...form.getInputProps("qualification")}
-                />
+              />
 
-                <TextInput
+              <TextInput
                   label="Specialty (Optional)"
                   placeholder="e.g., Orthodontics, Endodontics"
                   leftSection={<Award size={16} />}
@@ -545,60 +545,60 @@ export default function DentistsPage() {
                   max={50}
                   value={form.values.years_of_experience}
                   onChange={(value) => form.setFieldValue("years_of_experience", typeof value === "number" ? value : undefined)}
-                />
+              />
 
-                <Textarea
+              <Textarea
                   label="Bio (Optional)"
                   placeholder="Brief biography or description..."
                   rows={4}
                   {...form.getInputProps("bio")}
-                />
-              </Stack>
-            </Tabs.Panel>
+              />
+            </Stack>
+          </Tabs.Panel>
 
             <Tabs.Panel value="address" pt="md">
-              <Stack gap="md">
+            <Stack gap="md">
                 <TextInput
                   label="Street (Optional)"
                   placeholder="Street address"
                   {...form.getInputProps("street")}
-                />
+              />
 
-                <Group grow>
+              <Group grow>
                   <TextInput
                     label="City (Optional)"
                     placeholder="City"
                     {...form.getInputProps("city")}
-                  />
+                />
                   <TextInput
                     label="State (Optional)"
                     placeholder="State/Province"
                     {...form.getInputProps("state")}
-                  />
-                </Group>
-              </Stack>
-            </Tabs.Panel>
-          </Tabs>
+                />
+              </Group>
+            </Stack>
+          </Tabs.Panel>
+        </Tabs>
 
-          <Group justify="flex-end" mt="xl">
+        <Group justify="flex-end" mt="xl">
             <Button
               variant="light"
               onClick={() => {
-                close();
-                setSelectedDentist(null);
+            close();
+            setSelectedDentist(null);
                 form.reset();
               }}
             >
-              Cancel
-            </Button>
+            Cancel
+          </Button>
             <Button
               type="submit"
               className="bg-[#19b5af] hover:bg-[#14918c]"
               loading={isCreating || isUpdating}
             >
-              {selectedDentist ? "Update" : "Add"} Dentist
-            </Button>
-          </Group>
+            {selectedDentist ? "Update" : "Add"} Dentist
+          </Button>
+        </Group>
         </form>
       </Modal>
 
@@ -616,65 +616,65 @@ export default function DentistsPage() {
         {selectedDentist && (() => {
           const fullName = `${selectedDentist.profile?.user?.first_name || ""} ${selectedDentist.profile?.user?.last_name || ""}`.trim() || selectedDentist.name || "N/A";
           return (
-            <Stack gap="md">
-              <Group>
+          <Stack gap="md">
+            <Group>
                 <Avatar src={selectedDentist.profile_picture} size={80} radius="xl" />
-                <div>
+              <div>
                   <Text size="lg" fw={600}>{fullName}</Text>
                   <Text size="sm" c="dimmed" mb={4}>{selectedDentist.specialty || "N/A"}</Text>
-                  <Badge
-                    variant="light"
+                <Badge
+                  variant="light"
                     color={selectedDentist.is_licensed ? "green" : "gray"}
-                  >
+                >
                     {selectedDentist.is_licensed ? "Licensed" : "Not Licensed"}
-                  </Badge>
-                </div>
-              </Group>
+                </Badge>
+              </div>
+            </Group>
 
-              <Card className="bg-[#19b5af]/5 border border-[#19b5af]/20">
-                <Group justify="space-between">
-                  <div>
+            <Card className="bg-[#19b5af]/5 border border-[#19b5af]/20">
+              <Group justify="space-between">
+                <div>
                     <Text size="sm" fw={600}>Qualification</Text>
                     <Text size="xl" fw={700} mt={4}>{selectedDentist.qualification || "N/A"}</Text>
-                  </div>
-                  <div className="text-right">
-                    <Text size="sm" fw={600}>Experience</Text>
+                </div>
+                <div className="text-right">
+                  <Text size="sm" fw={600}>Experience</Text>
                     <Text size="xl" fw={700} mt={4}>
                       {selectedDentist.years_of_experience ? `${selectedDentist.years_of_experience} years` : "N/A"}
                     </Text>
-                  </div>
-                </Group>
-              </Card>
+                </div>
+              </Group>
+            </Card>
 
-              <div>
-                <Text size="sm" fw={600} mb={8}>Contact Information</Text>
-                <Stack gap={8}>
-                  <Group gap={8}>
-                    <Phone size={16} className="text-gray-400" />
+            <div>
+              <Text size="sm" fw={600} mb={8}>Contact Information</Text>
+              <Stack gap={8}>
+                <Group gap={8}>
+                  <Phone size={16} className="text-gray-400" />
                     <Text size="sm">{selectedDentist.profile?.phone_number || "N/A"}</Text>
-                  </Group>
+                </Group>
                   {selectedDentist.profile?.user?.email && (
-                    <Group gap={8}>
-                      <Mail size={16} className="text-gray-400" />
+                <Group gap={8}>
+                  <Mail size={16} className="text-gray-400" />
                       <Text size="sm">{selectedDentist.profile.user.email}</Text>
-                    </Group>
+                </Group>
                   )}
-                </Stack>
-              </div>
+              </Stack>
+            </div>
 
               {selectedDentist.bio && (
-                <div>
+            <div>
                   <Text size="sm" fw={600} mb={8}>Bio</Text>
                   <Card className="bg-gray-50">
                     <Text size="sm">{selectedDentist.bio}</Text>
                   </Card>
-                </div>
+            </div>
               )}
 
               {selectedDentist.address && (
-                <div>
+            <div>
                   <Text size="sm" fw={600} mb={8}>Address</Text>
-                  <Card className="bg-gray-50">
+              <Card className="bg-gray-50">
                     <Stack gap={4}>
                       {selectedDentist.address.street && (
                         <Text size="sm">{selectedDentist.address.street}</Text>
@@ -685,39 +685,39 @@ export default function DentistsPage() {
                           .join(", ") || "N/A"}
                       </Text>
                     </Stack>
-                  </Card>
-                </div>
+              </Card>
+            </div>
               )}
 
-              <div>
+            <div>
                 <Text size="sm" fw={600} mb={8}>Additional Information</Text>
-                <div className="grid grid-cols-2 gap-4">
-                  <Card className="bg-blue-50 border border-blue-200">
+              <div className="grid grid-cols-2 gap-4">
+                <Card className="bg-blue-50 border border-blue-200">
                     <Text size="xs" c="dimmed" mb={4}>Gender</Text>
                     <Text size="lg" fw={700}>{selectedDentist.gender || "N/A"}</Text>
-                  </Card>
-                  <Card className="bg-green-50 border border-green-200">
+                </Card>
+                <Card className="bg-green-50 border border-green-200">
                     <Text size="xs" c="dimmed" mb={4}>Date of Birth</Text>
                     <Text size="lg" fw={700}>{selectedDentist.dob || "N/A"}</Text>
-                  </Card>
-                </div>
+                </Card>
               </div>
+            </div>
 
-              <Group justify="flex-end" mt="md">
-                <Button variant="light" onClick={closeView}>
-                  Close
-                </Button>
-                <Button
-                  className="bg-[#19b5af] hover:bg-[#14918c]"
-                  onClick={() => {
-                    closeView();
-                    handleEditDentist(selectedDentist);
-                  }}
-                >
-                  Edit Profile
-                </Button>
-              </Group>
-            </Stack>
+            <Group justify="flex-end" mt="md">
+              <Button variant="light" onClick={closeView}>
+                Close
+              </Button>
+              <Button
+                className="bg-[#19b5af] hover:bg-[#14918c]"
+                onClick={() => {
+                  closeView();
+                  handleEditDentist(selectedDentist);
+                }}
+              >
+                Edit Profile
+              </Button>
+            </Group>
+          </Stack>
           );
         })()}
       </Modal>

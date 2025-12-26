@@ -26,7 +26,7 @@ const menuItems = [
     category: "Clinical",
     subItems: [
       { label: "Patient List", link: "/patients/list" },
-      { label: "Patient Records", link: "/patients/records" },
+      { label: "Payment Records", link: "/patients/records" },
     ],
   },
   {

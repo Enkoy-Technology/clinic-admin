@@ -259,14 +259,14 @@ export default function NotificationsPage() {
             <Group justify="space-between">
               <Badge variant="light" color="gray">
                 ID: {selectedMessage.id}
-              </Badge>
-              <Badge
-                variant="light"
-                color={selectedMessage.is_read ? "green" : "red"}
-                size="sm"
-              >
-                {selectedMessage.is_read ? "Read" : "Unread"}
-              </Badge>
+                </Badge>
+                <Badge
+                  variant="light"
+                  color={selectedMessage.is_read ? "green" : "red"}
+                  size="sm"
+                >
+                  {selectedMessage.is_read ? "Read" : "Unread"}
+                </Badge>
             </Group>
 
             <div>

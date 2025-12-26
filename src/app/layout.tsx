@@ -51,11 +51,11 @@ export default function RootLayout({
         <MantineProvider theme={theme}>
           <ColorSchemeScript />
           <Notifications position="top-right" />
-          <Provider store={store}>
-            <RootAdminLayout>
-              {children}
-            </RootAdminLayout>
-          </Provider>
+            <Provider store={store}>
+              <RootAdminLayout>
+                {children}
+              </RootAdminLayout>
+            </Provider>
         </MantineProvider>
       </body>
     </html>
