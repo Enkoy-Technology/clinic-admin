@@ -800,7 +800,7 @@ export default function PatientListPage() {
                           <ActionIcon
                             variant="light"
                             color="blue"
-                            onClick={() => handleViewPatient(patient)}
+                            onClick={() => router.push(`/patients/${patient.id}`)}
                           >
                             <Eye size={16} />
                           </ActionIcon>
@@ -827,7 +827,10 @@ export default function PatientListPage() {
                               >
                                 View Records
                               </Menu.Item>
-                              <Menu.Item leftSection={<Calendar size={16} />}>
+                              <Menu.Item
+                                leftSection={<Calendar size={16} />}
+                                onClick={() => router.push(`/patients/${patient.id}?tab=appointments`)}
+                              >
                                 Book Appointment
                               </Menu.Item>
 

@@ -34,6 +34,20 @@ export interface AppointmentsResponse {
 export interface GetAppointmentsParams {
   start_date: string;
   end_date: string;
+  patient?: number; // Optional patient filter
+}
+
+export interface CreateAppointmentRequest {
+  patient: number;
+  branch?: number; // Optional, defaults to 0
+  doctor?: number | null;
+  service?: number | null;
+  scheduled_date: string; // YYYY-MM-DD
+  start_time: string; // HH:MM:SS or ISO format
+  end_time: string; // HH:MM:SS or ISO format
+  status: "SCHEDULED" | "CONFIRMED" | "COMPLETED" | "CANCELLED" | "NO_SHOW";
+  reason?: string;
+  notes?: string;
 }
 
 export const appointmentsApi = createApi({
@@ -42,15 +56,24 @@ export const appointmentsApi = createApi({
   tagTypes: ["Appointments"],
   endpoints: (builder) => ({
     getActiveAppointments: builder.query<AppointmentsResponse, GetAppointmentsParams>({
-      query: ({ start_date, end_date }) => ({
-        url: `/appointments/active`,
-        params: { start_date, end_date },
-      }),
+      query: (params) => {
+        const queryParams: Record<string, string> = {
+          start_date: params.start_date,
+          end_date: params.end_date,
+        };
+        if (params.patient !== undefined) {
+          queryParams.patient = params.patient.toString();
+        }
+        return {
+          url: `/appointments/active`,
+          params: queryParams,
+        };
+      },
       providesTags: ["Appointments"],
     }),
-    createAppointment: builder.mutation<Appointment, Partial<Appointment>>({
+    createAppointment: builder.mutation<Appointment, CreateAppointmentRequest>({
       query: (appointment) => ({
-        url: "/appointments/active",
+        url: "/appointments/",
         method: "POST",
         body: appointment,
       }),
