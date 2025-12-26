@@ -8,6 +8,7 @@ import {
   Button,
   Card,
   Group,
+  Loader,
   Modal,
   Progress,
   Select,
@@ -33,6 +34,7 @@ import {
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useGetPatientsQuery } from "../../../shared/api/patientsApi";
+import { useGetInvoicesQuery, useGetPatientPaymentSummaryQuery } from "../../../shared/api/paymentsApi";
 
 // Mock payment records data - each record is tied to a patient
 const mockPaymentRecords = [
@@ -131,54 +133,159 @@ export default function PatientRecordsPage() {
     patientIdParam
   );
 
-  // Fetch patients for dropdown
-  const { data: patientsData } = useGetPatientsQuery({
-    page: 1,
-    per_page: 100,
-  });
+  // Fetch patients for dropdown - refetch on mount to ensure fresh data
+  const { data: patientsData, isLoading: isLoadingPatients } = useGetPatientsQuery(
+    {
+      page: 1,
+      per_page: 100,
+    },
+    {
+      refetchOnMountOrArgChange: true, // Force refetch when navigating to this page
+    }
+  );
+
+  // Fetch all invoices and payments from API - refetch on mount to ensure fresh data
+  const { data: invoicesData, isLoading: isLoadingInvoices } = useGetInvoicesQuery(
+    {
+      page: 1,
+      per_page: 1000, // Get all invoices
+    },
+    {
+      refetchOnMountOrArgChange: true, // Force refetch when navigating to this page
+    }
+  );
 
   // Get selected patient info
   const selectedPatient = patientsData?.results?.find(
     (p: any) => p.id.toString() === selectedPatientId
   );
 
-  // Aggregate payment records by patient (in real app, this would come from API)
-  // Group all invoices/payments by patient and calculate totals
+  // Fetch payment summary for selected patient if provided
+  const { data: patientPaymentSummary, isLoading: isLoadingPaymentSummary } = useGetPatientPaymentSummaryQuery(
+    parseInt(selectedPatientId || "0"),
+    {
+      skip: !selectedPatientId,
+      refetchOnMountOrArgChange: true, // Force refetch when navigating to this page
+    }
+  );
+
+  // Single loading state for the entire page
+  const isLoading = isLoadingPatients || isLoadingInvoices || (selectedPatientId ? isLoadingPaymentSummary : false);
+
+  // Aggregate payment records by patient from API
+  // Only aggregate when we have all necessary data loaded
   const patientPaymentData =
-    patientsData?.results?.map((patient: any) => {
-      // Get all payment records for this patient
-      const patientRecords = mockPaymentRecords.filter(
-        (record) => record.patientId?.toString() === patient.id.toString()
-      );
+    !isLoading && patientsData?.results
+      ? patientsData.results.map((patient: any) => {
+          // If this is the selected patient and we have detailed summary, use it
+          if (selectedPatientId && patient.id.toString() === selectedPatientId && patientPaymentSummary) {
+            const summary = patientPaymentSummary.summary;
+            const progressPercent = summary.total_expected > 0
+              ? (summary.total_paid / summary.total_expected) * 100
+              : 0;
 
-      const totalAmount = patientRecords.reduce((sum, r) => sum + r.amount, 0);
-      const totalPaid = patientRecords.reduce((sum, r) => sum + r.paid, 0);
-      const totalRemaining = totalAmount - totalPaid;
-      const progressPercent =
-        totalAmount > 0 ? (totalPaid / totalAmount) * 100 : 0;
+            let overallStatus = "pending";
+            if (summary.total_paid === 0) {
+              overallStatus = "pending";
+            } else if (summary.total_paid >= summary.total_expected) {
+              overallStatus = "paid";
+            } else {
+              overallStatus = "partial";
+            }
 
-      // Determine overall status
-      let overallStatus = "pending";
-      if (totalPaid === 0) {
-        overallStatus = "pending";
-      } else if (totalPaid >= totalAmount) {
-        overallStatus = "paid";
-      } else {
-        overallStatus = "partial";
-      }
+            return {
+              patientId: patient.id,
+              patient: patient,
+              totalAmount: summary.total_expected,
+              totalPaid: summary.total_paid,
+              totalRemaining: summary.remaining,
+              progressPercent,
+              status: overallStatus,
+              invoiceCount: patientPaymentSummary.invoices.length,
+              records: patientPaymentSummary.invoices.map((inv: any) => ({
+                id: inv.id,
+                invoiceId: `INV-${inv.id.toString().padStart(3, "0")}`,
+                date: inv.created_at.split("T")[0],
+                service: inv.service,
+                amount: parseFloat(inv.total_amount),
+                paid: parseFloat(inv.paid_amount || "0"),
+                status: inv.status,
+                paymentHistory: patientPaymentSummary.all_payments
+                  .filter((p: any) => p.invoice === inv.id)
+                  .map((p: any) => ({
+                    date: p.payment_date,
+                    amount: parseFloat(p.amount),
+                    method: p.payment_method,
+                  })),
+              })),
+            };
+          }
 
-      return {
-        patientId: patient.id,
-        patient: patient,
-        totalAmount,
-        totalPaid,
-        totalRemaining,
-        progressPercent,
-        status: overallStatus,
-        invoiceCount: patientRecords.length,
-        records: patientRecords, // Keep individual records for detail view
-      };
-    }) || [];
+          // For all patients, aggregate from invoices API data
+          // Invoice response has patient as an object: inv.patient.id
+          const patientInvoices = (invoicesData?.results || []).filter(
+            (inv: any) => {
+              // Handle both patient as object (inv.patient.id) and as number (inv.patient)
+              const invoicePatientId = inv.patient?.id || inv.patient;
+              return invoicePatientId?.toString() === patient.id.toString();
+            }
+          );
+
+          // Calculate totals from invoices
+          const totalAmount = patientInvoices.reduce(
+            (sum: number, inv: any) => sum + parseFloat(inv.total_amount || "0"),
+            0
+          );
+          const totalPaid = patientInvoices.reduce(
+            (sum: number, inv: any) => sum + parseFloat(inv.paid_amount || "0"),
+            0
+          );
+          const totalRemaining = totalAmount - totalPaid;
+          const progressPercent =
+            totalAmount > 0 ? (totalPaid / totalAmount) * 100 : 0;
+
+          // Determine overall status
+          let overallStatus = "pending";
+          if (totalPaid === 0) {
+            overallStatus = "pending";
+          } else if (totalPaid >= totalAmount) {
+            overallStatus = "paid";
+          } else {
+            overallStatus = "partial";
+          }
+
+          // Map invoices to records format
+          // Invoice response already includes payment_history array
+          const records = patientInvoices.map((inv: any) => {
+            return {
+              id: inv.id,
+              invoiceId: `INV-${inv.id.toString().padStart(3, "0")}`,
+              date: inv.created_at.split("T")[0],
+              service: inv.service,
+              amount: parseFloat(inv.total_amount || "0"),
+              paid: parseFloat(inv.paid_amount || "0"),
+              status: inv.status,
+              paymentHistory: (inv.payment_history || []).map((p: any) => ({
+                date: p.payment_date,
+                amount: parseFloat(p.amount),
+                method: p.payment_method,
+              })),
+            };
+          });
+
+          return {
+            patientId: patient.id,
+            patient: patient,
+            totalAmount,
+            totalPaid,
+            totalRemaining,
+            progressPercent,
+            status: overallStatus,
+            invoiceCount: patientInvoices.length,
+            records,
+          };
+        })
+      : [];
 
   // Filter by selected patient if provided
   let filteredPatientData = patientPaymentData;
@@ -223,6 +330,27 @@ export default function PatientRecordsPage() {
     }
   }, [patientIdParam]);
 
+  // Show single loading state for entire page
+  if (isLoading) {
+    return (
+      <Box>
+        <Group justify="space-between" mb="xl">
+          <div>
+            <Title order={2} className="text-gray-800">
+              Payment Records
+            </Title>
+            <Text size="sm" c="dimmed">
+              Loading payment records...
+            </Text>
+          </div>
+        </Group>
+        <div className="flex justify-center items-center py-32">
+          <Loader size="xl" color="teal" />
+        </div>
+      </Box>
+    );
+  }
+
   return (
     <Box>
       {/* Header */}
@@ -256,19 +384,27 @@ export default function PatientRecordsPage() {
           )}
         </div>
         <Group>
-          {selectedPatient && (
-            <Button
-              leftSection={<Plus size={18} />}
-              className="bg-[#19b5af] hover:bg-[#14918c]"
-              onClick={() =>
-                router.push(
-                  `/patients/payments/add?patientId=${selectedPatient.id}`
-                )
-              }
-            >
-              Add Payment
-            </Button>
-          )}
+          {selectedPatient && (() => {
+            // Find patient data to get invoices
+            const patientData = patientPaymentData.find(
+              (p) => p.patientId.toString() === selectedPatient.id.toString()
+            );
+            const invoices = patientData?.records || [];
+            const invoicesParam = encodeURIComponent(JSON.stringify(invoices));
+            return (
+          <Button
+            leftSection={<Plus size={18} />}
+            className="bg-[#19b5af] hover:bg-[#14918c]"
+                onClick={() =>
+                  router.push(
+                    `/patients/payments/add?patientId=${selectedPatient.id}&invoices=${invoicesParam}`
+                  )
+                }
+              >
+                Add Payment
+              </Button>
+            );
+          })()}
           <Button leftSection={<Download size={18} />} variant="light">
             Export
           </Button>
@@ -278,52 +414,52 @@ export default function PatientRecordsPage() {
       {/* Payment Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         {[
-          {
-            label: "Total Patients",
-            value: searchFiltered.length.toString(),
-            icon: FileText,
-            color: "bg-blue-500",
-          },
-          {
-            label: "Total Amount",
-            value: `ETB ${totalAmount.toLocaleString()}`,
-            icon: DollarSign,
-            color: "bg-purple-500",
-          },
-          {
-            label: "Total Paid",
-            value: `ETB ${totalPaid.toLocaleString()}`,
-            icon: CheckCircle2,
-            color: "bg-green-500",
-          },
-          {
-            label: "Remaining",
-            value: `ETB ${totalRemaining.toLocaleString()}`,
-            icon: Clock,
-            color: totalRemaining > 0 ? "bg-red-500" : "bg-gray-500",
-          },
+            {
+              label: "Total Patients",
+              value: searchFiltered.length.toString(),
+              icon: FileText,
+              color: "bg-blue-500",
+            },
+            {
+              label: "Total Amount",
+              value: `ETB ${totalAmount.toLocaleString()}`,
+              icon: DollarSign,
+              color: "bg-purple-500",
+            },
+            {
+              label: "Total Paid",
+              value: `ETB ${totalPaid.toLocaleString()}`,
+              icon: CheckCircle2,
+              color: "bg-green-500",
+            },
+            {
+              label: "Remaining",
+              value: `ETB ${totalRemaining.toLocaleString()}`,
+              icon: Clock,
+              color: totalRemaining > 0 ? "bg-red-500" : "bg-gray-500",
+            },
         ].map((stat, index) => (
-          <Card
-            key={index}
-            shadow="sm"
-            p="md"
-            className="border border-gray-200"
-          >
+            <Card
+              key={index}
+              shadow="sm"
+              p="md"
+              className="border border-gray-200"
+            >
             <Group justify="space-between">
               <div>
-                <Text size="sm" c="dimmed" mb={4}>
-                  {stat.label}
-                </Text>
-                <Text size="xl" fw={700}>
-                  {stat.value}
-                </Text>
+                  <Text size="sm" c="dimmed" mb={4}>
+                    {stat.label}
+                  </Text>
+                  <Text size="xl" fw={700}>
+                    {stat.value}
+                  </Text>
               </div>
               <div className={`${stat.color} p-3 rounded-lg`}>
                 <stat.icon size={24} className="text-white" />
               </div>
             </Group>
-          </Card>
-        ))}
+            </Card>
+          ))}
       </div>
 
       {/* Filters */}
@@ -385,7 +521,7 @@ export default function PatientRecordsPage() {
                   "N/A";
                 return (
                   <Table.Tr key={patientData.patientId}>
-                    <Table.Td>
+                  <Table.Td>
                       <Group gap="xs">
                         <Avatar
                           src={patientData.patient.profile_picture}
@@ -405,9 +541,9 @@ export default function PatientRecordsPage() {
                             </Text>
                           )}
                         </div>
-                      </Group>
-                    </Table.Td>
-                    <Table.Td>
+                    </Group>
+                  </Table.Td>
+                  <Table.Td>
                       <Text size="sm" fw={600}>
                         ETB {patientData.totalAmount.toLocaleString()}
                       </Text>
@@ -453,22 +589,22 @@ export default function PatientRecordsPage() {
                       <Badge variant="light" color="blue" size="sm">
                         {patientData.invoiceCount} invoice(s)
                       </Badge>
-                    </Table.Td>
-                    <Table.Td>
-                      <Badge
-                        variant="light"
+                  </Table.Td>
+                  <Table.Td>
+                    <Badge
+                      variant="light"
                         color={paymentStatusColors[patientData.status]}
-                        size="sm"
-                        className="capitalize"
-                      >
+                      size="sm"
+                      className="capitalize"
+                    >
                         {patientData.status}
-                      </Badge>
-                    </Table.Td>
-                    <Table.Td>
-                      <Group gap="xs">
-                        <ActionIcon
-                          variant="light"
-                          color="blue"
+                    </Badge>
+                  </Table.Td>
+                  <Table.Td>
+                    <Group gap="xs">
+                      <ActionIcon
+                        variant="light"
+                        color="blue"
                           onClick={() => {
                             setSelectedRecord({
                               patient: patientData.patient,
@@ -480,23 +616,25 @@ export default function PatientRecordsPage() {
                             });
                             openView();
                           }}
-                        >
-                          <Eye size={16} />
-                        </ActionIcon>
+                      >
+                        <Eye size={16} />
+                      </ActionIcon>
                         <Button
-                          variant="light"
+                        variant="light"
                           size="xs"
-                          onClick={() =>
+                          onClick={() => {
+                            const invoices = patientData.records || [];
+                            const invoicesParam = encodeURIComponent(JSON.stringify(invoices));
                             router.push(
-                              `/patients/payments/add?patientId=${patientData.patientId}`
-                            )
-                          }
+                              `/patients/payments/add?patientId=${patientData.patientId}&invoices=${invoicesParam}`
+                            );
+                          }}
                         >
                           Add Payment
                         </Button>
-                      </Group>
-                    </Table.Td>
-                  </Table.Tr>
+                    </Group>
+                  </Table.Td>
+                </Table.Tr>
                 );
               })
             )}
@@ -518,13 +656,13 @@ export default function PatientRecordsPage() {
         {selectedRecord && selectedRecord.patient && (
           <Stack gap="md">
             {/* Patient Info */}
-            <Group>
+              <Group>
               <Avatar
                 src={selectedRecord.patient.profile_picture}
                 size={60}
                 radius="xl"
               />
-              <div>
+                <div>
                 <Text size="lg" fw={600}>
                   {selectedRecord.patient.profile?.user?.first_name || ""}{" "}
                   {selectedRecord.patient.profile?.user?.last_name || ""}
@@ -537,7 +675,7 @@ export default function PatientRecordsPage() {
                     Phone: {selectedRecord.patient.profile.phone_number}
                   </Text>
                 )}
-              </div>
+                </div>
               <Badge
                 variant="light"
                 color={paymentStatusColors[selectedRecord.status]}
@@ -704,9 +842,11 @@ export default function PatientRecordsPage() {
               <Button
                 variant="light"
                 onClick={() => {
+                  const invoices = selectedRecord.records || [];
+                  const invoicesParam = encodeURIComponent(JSON.stringify(invoices));
                   closeView();
                   router.push(
-                    `/patients/payments/add?patientId=${selectedRecord.patient.id}`
+                    `/patients/payments/add?patientId=${selectedRecord.patient.id}&invoices=${invoicesParam}`
                   );
                 }}
                 leftSection={<Plus size={16} />}

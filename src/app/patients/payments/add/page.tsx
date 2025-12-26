@@ -6,10 +6,8 @@ import {
   Card,
   Group,
   NumberInput,
-  Radio,
   Select,
   Stack,
-  Tabs,
   Text,
   Textarea,
   TextInput,
@@ -28,31 +26,13 @@ import {
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useGetPatientsQuery } from "../../../../shared/api/patientsApi";
-
-// Mock invoices data - will be replaced with API call
-const mockInvoices = [
-  {
-    id: 1,
-    service: "Root Canal Treatment",
-    total_amount: 15000,
-    paid_amount: 0,
-    remaining: 15000,
-    status: "pending",
-  },
-  {
-    id: 2,
-    service: "Crown Preparation",
-    total_amount: 12000,
-    paid_amount: 5000,
-    remaining: 7000,
-    status: "partial",
-  },
-];
+import { useCreateInvoiceMutation, useCreatePaymentMutation } from "../../../../shared/api/paymentsApi";
 
 export default function AddPaymentPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const patientId = searchParams.get("patientId");
+  const invoicesParam = searchParams.get("invoices");
 
   const [selectedInvoice, setSelectedInvoice] = useState<string | null>(null);
 
@@ -60,10 +40,24 @@ export default function AddPaymentPage() {
   const { data: patientsData } = useGetPatientsQuery({ page: 1, per_page: 100 });
   const patient = patientsData?.results?.find((p: any) => p.id.toString() === patientId);
 
-  // Check if patient has existing invoices
-  // In real app, this would come from API: GET /api/patients/{id}/invoices
-  // For now, using mock data - if patient has any invoices, they're existing
-  const hasExistingInvoices = mockInvoices.length > 0; // TODO: Replace with actual API call to check patient's invoices
+  // Parse invoices from URL params (passed from records page)
+  let invoicesData: any = null;
+  try {
+    if (invoicesParam) {
+      const decoded = decodeURIComponent(invoicesParam);
+      const parsed = JSON.parse(decoded);
+      invoicesData = { results: parsed };
+    }
+  } catch (e) {
+    console.error("Failed to parse invoices from URL:", e);
+  }
+
+  // API mutations
+  const [createInvoice, { isLoading: isCreatingInvoice }] = useCreateInvoiceMutation();
+  const [createPayment, { isLoading: isCreatingPayment }] = useCreatePaymentMutation();
+
+  // Check if patient has existing invoices (from passed data)
+  const hasExistingInvoices = (invoicesData?.results?.length || 0) > 0;
 
   // Automatically determine payment type based on existing invoices
   // If patient has invoices → add payment to existing invoice
@@ -121,6 +115,8 @@ export default function AddPaymentPage() {
   }, [patientId, router]);
 
   const handleSubmit = async (values: typeof paymentForm.values) => {
+    if (!patientId) return;
+
     // Additional validation
     if (paymentType === "existing" && !selectedInvoice) {
       notifications.show({
@@ -133,23 +129,25 @@ export default function AddPaymentPage() {
 
     try {
       if (paymentType === "new") {
-        // TODO: Create new invoice and add first payment
         // Step 1: Create invoice
-        // await createInvoiceMutation({
-        //   patient_id: parseInt(patientId!),
-        //   service: values.service_name,
-        //   total_amount: parseFloat(values.total_amount),
-        // }).unwrap();
+        const newInvoice = await createInvoice({
+          patient: parseInt(patientId),
+          service: values.service_name,
+          total_amount: parseFloat(values.total_amount).toFixed(2),
+          notes: values.notes || undefined,
+        }).unwrap();
 
         // Step 2: Add payment to the new invoice
-        // await addPaymentMutation({
-        //   patient_id: parseInt(patientId!),
-        //   invoice_id: newInvoiceId,
-        //   amount: parseFloat(values.payment_amount),
-        //   payment_date: values.payment_date.toISOString().split("T")[0],
-        //   payment_method: values.payment_method,
-        //   notes: values.notes,
-        // }).unwrap();
+        const dateObj = values.payment_date || new Date();
+        const paymentDate = dateObj.toISOString().split("T")[0]!;
+        await createPayment({
+          patient: parseInt(patientId),
+          invoice: newInvoice.id,
+          amount: parseFloat(values.payment_amount).toFixed(2),
+          payment_date: paymentDate,
+          payment_method: (values.payment_method || "Cash") as "Cash" | "Bank Transfer" | "Mobile Money" | "Credit Card" | "Check",
+          notes: values.notes || undefined,
+        }).unwrap();
 
         notifications.show({
           title: "Success",
@@ -157,15 +155,17 @@ export default function AddPaymentPage() {
           color: "green",
         });
       } else {
-        // TODO: Add payment to existing invoice
-        // await addPaymentMutation({
-        //   patient_id: parseInt(patientId!),
-        //   invoice_id: selectedInvoice ? parseInt(selectedInvoice) : null,
-        //   amount: parseFloat(values.payment_amount),
-        //   payment_date: values.payment_date.toISOString().split("T")[0],
-        //   payment_method: values.payment_method,
-        //   notes: values.notes,
-        // }).unwrap();
+        // Add payment to existing invoice
+        const dateObj = values.payment_date || new Date();
+        const paymentDate = dateObj.toISOString().split("T")[0]!;
+        await createPayment({
+          patient: parseInt(patientId),
+          invoice: selectedInvoice ? parseInt(selectedInvoice) : null,
+          amount: parseFloat(values.payment_amount).toFixed(2),
+          payment_date: paymentDate,
+          payment_method: (values.payment_method || "Cash") as "Cash" | "Bank Transfer" | "Mobile Money" | "Credit Card" | "Check",
+          notes: values.notes || undefined,
+        }).unwrap();
 
         notifications.show({
           title: "Success",
@@ -177,10 +177,29 @@ export default function AddPaymentPage() {
       // Redirect back to patient records
       router.push(`/patients/records?patientId=${patientId}`);
     } catch (error: any) {
+      // Handle field-specific errors
+      const errorData = error?.data || {};
+      const fieldErrors: string[] = [];
+
+      Object.keys(errorData).forEach((field) => {
+        const fieldError = errorData[field];
+        if (Array.isArray(fieldError)) {
+          const errorMessage = fieldError[0] || fieldError;
+          fieldErrors.push(`${field}: ${errorMessage}`);
+        } else if (typeof fieldError === "string") {
+          fieldErrors.push(`${field}: ${fieldError}`);
+        }
+      });
+
+      const errorMessage = fieldErrors.length > 0
+        ? fieldErrors.join("\n")
+        : errorData?.detail || errorData?.message || "Failed to process payment";
+
       notifications.show({
         title: "Error",
-        message: error?.data?.detail || error?.data?.message || "Failed to process payment",
+        message: errorMessage,
         color: "red",
+        autoClose: 5000,
       });
     }
   };
@@ -306,10 +325,15 @@ export default function AddPaymentPage() {
                       label="Select Invoice/Service"
                       placeholder="Select invoice to apply payment to"
                       required
-                      data={mockInvoices.map((invoice) => ({
-                        value: invoice.id.toString(),
-                        label: `${invoice.service} - ETB ${invoice.total_amount.toLocaleString()} (Remaining: ETB ${invoice.remaining.toLocaleString()})`,
-                      }))}
+                      data={(invoicesData?.results || []).map((invoice: any) => {
+                        const remaining = parseFloat(invoice.amount || invoice.total_amount || "0") - parseFloat(invoice.paid || invoice.paid_amount || "0");
+                        const serviceName = invoice.service || invoice.service_name || "Unknown Service";
+                        const totalAmount = parseFloat(invoice.amount || invoice.total_amount || "0");
+                        return {
+                          value: invoice.id.toString(),
+                          label: `${serviceName} - ETB ${totalAmount.toLocaleString()} (Remaining: ETB ${remaining.toLocaleString()})`,
+                        };
+                      })}
                       value={selectedInvoice}
                       onChange={setSelectedInvoice}
                       leftSection={<FileText size={16} />}
@@ -384,14 +408,31 @@ export default function AddPaymentPage() {
                     </div>
                   </>
                 )}
-                {paymentType === "existing" && selectedInvoice && (
-                  <div>
-                    <Text size="xs" c="dimmed" mb={4}>Invoice</Text>
-                    <Text size="sm" fw={500}>
-                      {mockInvoices.find(inv => inv.id.toString() === selectedInvoice)?.service || "N/A"}
-                    </Text>
-                  </div>
-                )}
+                {paymentType === "existing" && selectedInvoice && (() => {
+                  const selectedInv = invoicesData?.results?.find((inv: any) => inv.id.toString() === selectedInvoice);
+                  if (selectedInv) {
+                    const serviceName = selectedInv.service || selectedInv.service_name || "Unknown Service";
+                    const totalAmount = parseFloat(selectedInv.amount || selectedInv.total_amount || "0");
+                    const currentPaid = parseFloat(selectedInv.paid || selectedInv.paid_amount || "0");
+                    return (
+                      <>
+                        <div>
+                          <Text size="xs" c="dimmed" mb={4}>Invoice</Text>
+                          <Text size="sm" fw={500}>{serviceName}</Text>
+                        </div>
+                        <div>
+                          <Text size="xs" c="dimmed" mb={4}>Invoice Total</Text>
+                          <Text size="sm" fw={500}>ETB {totalAmount.toLocaleString()}</Text>
+                        </div>
+                        <div>
+                          <Text size="xs" c="dimmed" mb={4}>Already Paid</Text>
+                          <Text size="sm" fw={500}>ETB {currentPaid.toLocaleString()}</Text>
+                        </div>
+                      </>
+                    );
+                  }
+                  return null;
+                })()}
                 <div>
                   <Text size="xs" c="dimmed" mb={4}>Payment Amount</Text>
                   <Text size="lg" fw={700}>
@@ -419,6 +460,24 @@ export default function AddPaymentPage() {
                     </Text>
                   </div>
                 )}
+                {paymentType === "existing" && selectedInvoice && paymentForm.values.payment_amount && (() => {
+                  const selectedInv = invoicesData?.results?.find((inv: any) => inv.id.toString() === selectedInvoice);
+                  if (selectedInv) {
+                    const totalAmount = parseFloat(selectedInv.amount || selectedInv.total_amount || "0");
+                    const currentPaid = parseFloat(selectedInv.paid || selectedInv.paid_amount || "0");
+                    const newPayment = parseFloat(paymentForm.values.payment_amount || "0");
+                    const remaining = totalAmount - currentPaid - newPayment;
+                    return (
+                      <div>
+                        <Text size="xs" c="dimmed" mb={4}>Remaining After Payment</Text>
+                        <Text size="sm" fw={600} className="text-orange-600">
+                          ETB {remaining.toLocaleString()}
+                        </Text>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </Stack>
 
               <Group grow mt="xl">
@@ -431,6 +490,7 @@ export default function AddPaymentPage() {
                 <Button
                   type="submit"
                   className="bg-[#19b5af] hover:bg-[#14918c]"
+                  loading={isCreatingInvoice || isCreatingPayment}
                 >
                   {paymentType === "new" ? "Create Invoice & Add Payment" : "Add Payment"}
                 </Button>

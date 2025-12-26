@@ -7,6 +7,7 @@ import {
   Button,
   Card,
   Group,
+  Loader,
   Progress,
   Stack,
   Text,
@@ -15,65 +16,68 @@ import {
 } from "@mantine/core";
 import {
   ArrowRight,
-  Calendar,
   FileText,
   Phone,
   Plus,
   Search,
   TrendingUp,
-  Users,
-  UserPlus
+  UserPlus,
+  Users
 } from "lucide-react";
 import Link from "next/link";
-
-// Mock data
-const recentPatients = [
-  {
-    id: 1,
-    name: "Abebe Kebede",
-    phone: "+251 911 234 567",
-    lastVisit: "Dec 15, 2024",
-    nextAppointment: "Dec 20, 2024",
-    status: "active",
-    avatar: "https://i.pravatar.cc/100?img=1",
-  },
-  {
-    id: 2,
-    name: "Tigist Alemu",
-    phone: "+251 912 345 678",
-    lastVisit: "Dec 14, 2024",
-    nextAppointment: "Dec 18, 2024",
-    status: "active",
-    avatar: "https://i.pravatar.cc/100?img=2",
-  },
-  {
-    id: 3,
-    name: "Dawit Tadesse",
-    phone: "+251 913 456 789",
-    lastVisit: "Dec 10, 2024",
-    nextAppointment: null,
-    status: "inactive",
-    avatar: "https://i.pravatar.cc/100?img=3",
-  },
-  {
-    id: 4,
-    name: "Meron Hailu",
-    phone: "+251 914 567 890",
-    lastVisit: "Dec 16, 2024",
-    nextAppointment: "Dec 22, 2024",
-    status: "active",
-    avatar: "https://i.pravatar.cc/100?img=4",
-  },
-];
-
-const ageGroups = [
-  { range: "0-18", count: 245, percentage: 20 },
-  { range: "19-35", count: 420, percentage: 34 },
-  { range: "36-50", count: 380, percentage: 30 },
-  { range: "51+", count: 203, percentage: 16 },
-];
+import { useRouter } from "next/navigation";
+import { useGetPatientsQuery } from "../../shared/api/patientsApi";
 
 export default function PatientsPage() {
+  const router = useRouter();
+
+  // Fetch patients data from API - refetch on mount to ensure fresh data
+  const { data: patientsData, isLoading: isLoadingPatients } = useGetPatientsQuery(
+    {
+      page: 1,
+      per_page: 10, // Get recent 10 patients
+    },
+    {
+      refetchOnMountOrArgChange: true, // Force refetch when navigating to this page
+    }
+  );
+
+  const patients = patientsData?.results || [];
+  const totalPatients = patientsData?.count || 0;
+
+  // Calculate stats from API data
+  const activePatients = patients.filter((p: any) => p.status?.toUpperCase() === "ACTIVE").length;
+  const completedPatients = patients.filter((p: any) => p.status?.toUpperCase() === "COMPLETED").length;
+  const pendingPatients = patients.filter((p: any) => p.status?.toUpperCase() === "PENDING").length;
+  const archivedPatients = patients.filter((p: any) => p.status?.toUpperCase() === "ARCHIVED").length;
+
+  // Calculate age distribution (mock for now - would need age data from API)
+  const ageGroups = [
+    { range: "0-18", count: 0, percentage: 0 },
+    { range: "19-35", count: 0, percentage: 0 },
+    { range: "36-50", count: 0, percentage: 0 },
+    { range: "51+", count: 0, percentage: 0 },
+  ];
+
+  // Calculate gender distribution
+  const maleCount = patients.filter((p: any) => p.gender === "MALE").length;
+  const femaleCount = patients.filter((p: any) => p.gender === "FEMALE").length;
+  const totalGender = maleCount + femaleCount;
+  const malePercentage = totalGender > 0 ? Math.round((maleCount / totalGender) * 100) : 0;
+  const femalePercentage = totalGender > 0 ? Math.round((femaleCount / totalGender) * 100) : 0;
+
+  // Get recent patients (last 4 from API)
+  const recentPatients = patients.slice(0, 4).map((patient: any) => {
+    const fullName = `${patient.profile?.user?.first_name || ""} ${patient.profile?.user?.last_name || ""}`.trim() || patient.name || "N/A";
+    return {
+      id: patient.id,
+      name: fullName,
+      phone: patient.profile?.phone_number || "N/A",
+      status: patient.status?.toLowerCase() || "active",
+      avatar: patient.profile_picture,
+      patient: patient, // Keep full patient object for navigation
+    };
+  });
   return (
     <Box>
       {/* Header */}
@@ -85,39 +89,45 @@ export default function PatientsPage() {
         <Button
           leftSection={<Plus size={18} />}
           className="bg-[#19b5af] hover:bg-[#14918c]"
+          onClick={() => router.push("/patients/list")}
         >
           Add New Patient
         </Button>
       </Group>
 
       {/* Stats Cards */}
+      {isLoadingPatients ? (
+        <div className="flex justify-center items-center py-16 mb-6">
+          <Loader size="lg" color="teal" />
+        </div>
+      ) : (
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
         {[
           {
             title: "Total Patients",
-            value: "1,248",
-            change: "+48 this month",
+            value: totalPatients.toLocaleString(),
+            change: `${patients.length} shown`,
             icon: Users,
             color: "bg-blue-500",
           },
           {
-            title: "New This Month",
-            value: "48",
-            change: "+12% from last month",
-            icon: UserPlus,
+            title: "Active Patients",
+            value: activePatients.toString(),
+            change: `${totalPatients > 0 ? Math.round((activePatients / totalPatients) * 100) : 0}% of total`,
+            icon: TrendingUp,
             color: "bg-green-500",
           },
           {
-            title: "Active Patients",
-            value: "892",
-            change: "71% of total",
-            icon: TrendingUp,
+            title: "Completed",
+            value: completedPatients.toString(),
+            change: `${totalPatients > 0 ? Math.round((completedPatients / totalPatients) * 100) : 0}% of total`,
+            icon: UserPlus,
             color: "bg-purple-500",
           },
           {
-            title: "Records Updated",
-            value: "124",
-            change: "This week",
+            title: "Pending",
+            value: pendingPatients.toString(),
+            change: `${totalPatients > 0 ? Math.round((pendingPatients / totalPatients) * 100) : 0}% of total`,
             icon: FileText,
             color: "bg-yellow-500",
           },
@@ -134,6 +144,7 @@ export default function PatientsPage() {
           </Card>
         ))}
       </div>
+      )}
 
       {/* Quick Actions */}
       <Card shadow="sm" p="lg" mb="lg" className="border border-gray-200">
@@ -188,48 +199,47 @@ export default function PatientsPage() {
           </Group>
 
           <Stack gap="md">
-            {recentPatients.map((patient) => (
-              <Card key={patient.id} className="bg-gray-50 border border-gray-200 hover:border-[#19b5af] transition-colors">
-                <Group justify="space-between">
-                  <Group>
-                    <Avatar src={patient.avatar} size={50} radius="xl" />
-                    <div>
-                      <Text size="sm" fw={600}>{patient.name}</Text>
-                      <Group gap={6}>
-                        <Phone size={14} className="text-gray-400" />
-                        <Text size="xs" c="dimmed">{patient.phone}</Text>
-                      </Group>
-                    </div>
-                  </Group>
-                  <Group>
-                    <div className="text-right">
-                      <Text size="xs" c="dimmed">Last Visit</Text>
-                      <Text size="xs" fw={500}>{patient.lastVisit}</Text>
-                    </div>
-                    {patient.nextAppointment ? (
-                      <div className="text-right">
-                        <Text size="xs" c="dimmed">Next</Text>
-                        <Text size="xs" fw={500} className="text-[#19b5af]">
-                          {patient.nextAppointment}
-                        </Text>
+            {isLoadingPatients ? (
+              <div className="flex justify-center items-center py-8">
+                <Loader size="md" color="teal" />
+              </div>
+            ) : recentPatients.length === 0 ? (
+              <Text ta="center" py="xl" c="dimmed">
+                No patients found
+              </Text>
+            ) : (
+              recentPatients.map((patient) => (
+                <Card
+                  key={patient.id}
+                  className="bg-gray-50 border border-gray-200 hover:border-[#19b5af] transition-colors cursor-pointer"
+                  onClick={() => router.push(`/patients/list`)}
+                >
+                  <Group justify="space-between">
+                    <Group>
+                      <Avatar src={patient.avatar} size={50} radius="xl" />
+                      <div>
+                        <Text size="sm" fw={600}>{patient.name}</Text>
+                        <Group gap={6}>
+                          <Phone size={14} className="text-gray-400" />
+                          <Text size="xs" c="dimmed">{patient.phone}</Text>
+                        </Group>
+                        <Text size="xs" c="dimmed" mt={2}>ID: #{patient.id}</Text>
                       </div>
-                    ) : (
-                      <Badge variant="light" color="gray" size="sm">
-                        No upcoming
+                    </Group>
+                    <Group>
+                      <Badge
+                        variant="light"
+                        color={patient.status === "active" ? "green" : patient.status === "completed" ? "blue" : "gray"}
+                        size="sm"
+                        className="capitalize"
+                      >
+                        {patient.status}
                       </Badge>
-                    )}
-                    <Badge
-                      variant="light"
-                      color={patient.status === "active" ? "green" : "gray"}
-                      size="sm"
-                      className="capitalize"
-                    >
-                      {patient.status}
-                    </Badge>
+                    </Group>
                   </Group>
-                </Group>
-              </Card>
-            ))}
+                </Card>
+              ))
+            )}
           </Stack>
         </Card>
 
@@ -263,14 +273,14 @@ export default function PatientsPage() {
             <Text size="sm" fw={600} mb={4}>Gender Distribution</Text>
             <Group justify="space-between" mb={8}>
               <Text size="xs" c="dimmed">Female</Text>
-              <Text size="sm" fw={600}>52%</Text>
+              <Text size="sm" fw={600}>{femalePercentage}%</Text>
             </Group>
-            <Progress value={52} color="pink" size="sm" radius="xl" mb="sm" />
+            <Progress value={femalePercentage} color="pink" size="sm" radius="xl" mb="sm" />
             <Group justify="space-between" mb={8}>
               <Text size="xs" c="dimmed">Male</Text>
-              <Text size="sm" fw={600}>48%</Text>
+              <Text size="sm" fw={600}>{malePercentage}%</Text>
             </Group>
-            <Progress value={48} color="blue" size="sm" radius="xl" />
+            <Progress value={malePercentage} color="blue" size="sm" radius="xl" />
           </Card>
         </Card>
       </div>
@@ -284,8 +294,17 @@ export default function PatientsPage() {
             leftSection={<Search size={16} />}
             className="flex-1"
             size="md"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                router.push("/patients/list");
+              }
+            }}
           />
-          <Button size="md" className="bg-[#19b5af] hover:bg-[#14918c]">
+          <Button
+            size="md"
+            className="bg-[#19b5af] hover:bg-[#14918c]"
+            onClick={() => router.push("/patients/list")}
+          >
             Search
           </Button>
         </Group>

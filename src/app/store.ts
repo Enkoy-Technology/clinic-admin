@@ -6,6 +6,7 @@ import { authApi } from "../shared/api/authApi";
 import { doctorsApi } from "../shared/api/doctorsApi";
 import { messagesApi } from "../shared/api/messagesApi";
 import { patientsApi } from "../shared/api/patientsApi";
+import { paymentsApi } from "../shared/api/paymentsApi";
 import { servicesApi } from "../shared/api/servicesApi";
 import authReducer from "../shared/slices/authSlice";
 
@@ -16,6 +17,7 @@ export const store = configureStore({
     [messagesApi.reducerPath]: messagesApi.reducer,
     [doctorsApi.reducerPath]: doctorsApi.reducer,
     [patientsApi.reducerPath]: patientsApi.reducer,
+    [paymentsApi.reducerPath]: paymentsApi.reducer,
     [servicesApi.reducerPath]: servicesApi.reducer,
     auth: authReducer,
   },
@@ -26,6 +28,7 @@ export const store = configureStore({
       messagesApi.middleware,
       doctorsApi.middleware,
       patientsApi.middleware,
+      paymentsApi.middleware,
       servicesApi.middleware
     ),
 });
