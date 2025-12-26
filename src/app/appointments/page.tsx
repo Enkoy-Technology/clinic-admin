@@ -48,6 +48,15 @@ import { useGetDoctorsQuery } from "../../shared/api/doctorsApi";
 import { useGetPatientsQuery } from "../../shared/api/patientsApi";
 import { useGetServicesQuery } from "../../shared/api/servicesApi";
 
+// Status colors mapping
+const statusColors: Record<string, string> = {
+  SCHEDULED: "blue",
+  CONFIRMED: "green",
+  COMPLETED: "gray",
+  CANCELLED: "red",
+  NO_SHOW: "orange",
+};
+
 // Time slots in 24-hour format for backend
 const timeSlots24 = [
   "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
@@ -125,6 +134,9 @@ export default function AppointmentsPage() {
   const [activeTab, setActiveTab] = useState<string>("daily");
   const [bookModalOpened, { open: openBook, close: closeBook }] = useDisclosure(false);
   const [editModalOpened, { open: openEdit, close: closeEdit }] = useDisclosure(false);
+  const [detailModalOpened, { open: openDetail, close: closeDetail }] = useDisclosure(false);
+  const [selectedAppointments, setSelectedAppointments] = useState<any[]>([]);
+  const [selectedDateForDetail, setSelectedDateForDetail] = useState<Date | null>(null);
 
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
@@ -949,10 +961,17 @@ export default function AppointmentsPage() {
                 return (
                   <Card
                     key={index}
-                    className={`border-2 ${
+                    className={`border-2 cursor-pointer hover:shadow-md transition-all ${
                       isToday(day.getDate(), day) ? "border-[#19b5af] bg-[#19b5af]/5" : "border-gray-200"
                     }`}
                     padding="lg"
+                    onClick={() => {
+                      if (dayAppointments.length > 0) {
+                        setSelectedAppointments(dayAppointments);
+                        setSelectedDateForDetail(day);
+                        openDetail();
+                      }
+                    }}
                   >
                     <div className="text-center mb-4">
                       <Text size="xs" c="dimmed" tt="uppercase" mb={4}>
@@ -966,7 +985,10 @@ export default function AppointmentsPage() {
                     <div className="space-y-2">
                       {dayAppointments.length > 0 ? (
                         dayAppointments.slice(0, 3).map((apt) => (
-                          <div key={apt.id} className="bg-green-50 border border-green-200 rounded-lg p-2">
+                          <div
+                            key={apt.id}
+                            className="bg-green-50 border border-green-200 rounded-lg p-2"
+                          >
                             <Group gap={6} mb={4}>
                               <Clock size={12} className="text-green-600" />
                               <Text size="xs" fw={600} className="text-green-700">
@@ -1049,6 +1071,8 @@ export default function AppointmentsPage() {
                 const dateKey = formatDateForAPI(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day));
                 const dayAppointments = appointmentsByDate[dateKey || ""] || [];
 
+                const dayDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+
                 return (
                   <div
                     key={index}
@@ -1057,6 +1081,13 @@ export default function AppointmentsPage() {
                       ${isToday(day) ? "border-[#19b5af] bg-[#19b5af]/10" : "border-gray-200"}
                       ${dayAppointments.length > 0 ? "bg-green-50 hover:bg-green-100" : "bg-white"}
                     `}
+                    onClick={() => {
+                      if (dayAppointments.length > 0) {
+                        setSelectedAppointments(dayAppointments);
+                        setSelectedDateForDetail(dayDate);
+                        openDetail();
+                      }
+                    }}
                   >
                     <Text size="lg" fw={700} className={isToday(day) ? "text-[#19b5af]" : "text-gray-700"} mb="xs">
                       {day}
@@ -1508,6 +1539,124 @@ export default function AppointmentsPage() {
             </Group>
           </Stack>
         </form>
+      </Modal>
+
+      {/* Appointment Detail Modal */}
+      <Modal
+        opened={detailModalOpened}
+        onClose={() => {
+          closeDetail();
+          setSelectedAppointments([]);
+          setSelectedDateForDetail(null);
+        }}
+        title={
+          <Group>
+            <Calendar size={20} className="text-[#19b5af]" />
+            <Text fw={600} size="lg">
+              Appointments {selectedDateForDetail && `- ${formatDate(selectedDateForDetail)}`}
+            </Text>
+          </Group>
+        }
+        size="lg"
+      >
+        {selectedAppointments.length === 0 ? (
+          <Text c="dimmed" ta="center" py="xl">
+            No appointments found
+          </Text>
+        ) : (
+          <Stack gap="md">
+            {selectedAppointments.map((apt: any) => {
+              const patientName = apt.patient?.name || "Unnamed Patient";
+              const doctorName = typeof apt.doctor === "object" && apt.doctor?.name
+                ? apt.doctor.name
+                : typeof apt.doctor === "string"
+                ? apt.doctor
+                : "Not assigned";
+              const serviceName = typeof apt.service === "object" && apt.service?.name
+                ? apt.service.name
+                : typeof apt.service === "string"
+                ? apt.service
+                : "Not assigned";
+
+              return (
+                <Card key={apt.id} shadow="sm" p="md" className="border border-gray-200">
+                  <Stack gap="sm">
+                    <Group justify="space-between">
+                      <Group gap="xs">
+                        <Clock size={16} className="text-[#19b5af]" />
+                        <Text fw={600} size="md">
+                          {formatTimeWithET(apt.formatted_start_time)}
+                        </Text>
+                        {apt.formatted_end_time && (
+                          <>
+                            <Text c="dimmed">-</Text>
+                            <Text size="sm" c="dimmed">
+                              {formatTimeWithET(apt.formatted_end_time)}
+                            </Text>
+                          </>
+                        )}
+                      </Group>
+                      <Badge
+                        variant="light"
+                        color={statusColors[apt.status] || "gray"}
+                        size="sm"
+                        className="capitalize"
+                      >
+                        {apt.status}
+                      </Badge>
+                    </Group>
+
+                    <div>
+                      <Text size="xs" c="dimmed" mb={4}>
+                        Patient
+                      </Text>
+                      <Text size="sm" fw={500}>
+                        {patientName}
+                      </Text>
+                    </div>
+
+                    <Group grow>
+                      <div>
+                        <Text size="xs" c="dimmed" mb={4}>
+                          Doctor
+                        </Text>
+                        <Text size="sm" fw={500}>
+                          {doctorName}
+                        </Text>
+                      </div>
+                      <div>
+                        <Text size="xs" c="dimmed" mb={4}>
+                          Service
+                        </Text>
+                        <Text size="sm" fw={500}>
+                          {serviceName}
+                        </Text>
+                      </div>
+                    </Group>
+
+                    {apt.reason && (
+                      <div>
+                        <Text size="xs" c="dimmed" mb={4}>
+                          Reason
+                        </Text>
+                        <Text size="sm">{apt.reason}</Text>
+                      </div>
+                    )}
+
+                    {apt.notes && (
+                      <div>
+                        <Text size="xs" c="dimmed" mb={4}>
+                          Notes
+                        </Text>
+                        <Text size="sm">{apt.notes}</Text>
+                      </div>
+                    )}
+                  </Stack>
+                </Card>
+              );
+            })}
+          </Stack>
+        )}
       </Modal>
     </Box>
   );
