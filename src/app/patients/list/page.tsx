@@ -42,6 +42,7 @@ import {
   User
 } from "lucide-react";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useCreatePatientMutation, useDeletePatientMutation, useGetPatientsQuery, useUpdatePatientMutation, type CreatePatientRequest } from "../../../shared/api/patientsApi";
 
 const statusColors: Record<string, string> = {
@@ -56,6 +57,7 @@ const statusColors: Record<string, string> = {
 };
 
 export default function PatientListPage() {
+  const router = useRouter();
   const [opened, { open, close }] = useDisclosure(false);
   const [viewModalOpened, { open: openView, close: closeView }] = useDisclosure(false);
   const [deleteModalOpened, { open: openDeleteModal, close: closeDeleteModal }] = useDisclosure(false);
@@ -745,7 +747,10 @@ export default function PatientListPage() {
                               </ActionIcon>
                             </Menu.Target>
                             <Menu.Dropdown>
-                              <Menu.Item leftSection={<FileText size={16} />}>
+                              <Menu.Item
+                                leftSection={<FileText size={16} />}
+                                onClick={() => router.push(`/patients/records?patientId=${patient.id}`)}
+                              >
                                 View Records
                               </Menu.Item>
                               <Menu.Item leftSection={<Calendar size={16} />}>

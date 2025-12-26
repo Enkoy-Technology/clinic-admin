@@ -1,41 +1,44 @@
 "use client";
 
 import {
-    ActionIcon,
-    Badge,
-    Box,
-    Button,
-    Card,
-    Group,
-    Loader,
-    Menu,
-    Modal,
-    Stack,
-    Switch,
-    Table,
-    Text,
-    Textarea,
-    TextInput,
-    Title
+  ActionIcon,
+  Badge,
+  Box,
+  Button,
+  Card,
+  Group,
+  Loader,
+  Menu,
+  Modal,
+  Stack,
+  Switch,
+  Table,
+  Text,
+  Textarea,
+  TextInput,
+  Title,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { useDisclosure } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
-import {
-    Edit,
-    Eye,
-    MoreVertical,
-    Plus,
-    Search,
-    Trash2
-} from "lucide-react";
+import { Edit, Eye, MoreVertical, Plus, Search, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { useCreateServiceMutation, useDeleteServiceMutation, useGetServicesQuery, useUpdateServiceMutation, type CreateServiceRequest } from "../../shared/api/servicesApi";
+import {
+  useCreateServiceMutation,
+  useDeleteServiceMutation,
+  useGetServicesQuery,
+  useUpdateServiceMutation,
+  type CreateServiceRequest,
+} from "../../shared/api/servicesApi";
 
 export default function ServicesPage() {
   const [opened, { open, close }] = useDisclosure(false);
-  const [viewModalOpened, { open: openView, close: closeView }] = useDisclosure(false);
-  const [deleteModalOpened, { open: openDeleteModal, close: closeDeleteModal }] = useDisclosure(false);
+  const [viewModalOpened, { open: openView, close: closeView }] =
+    useDisclosure(false);
+  const [
+    deleteModalOpened,
+    { open: openDeleteModal, close: closeDeleteModal },
+  ] = useDisclosure(false);
   const [serviceToDelete, setServiceToDelete] = useState<any>(null);
   const [selectedService, setSelectedService] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -45,7 +48,11 @@ export default function ServicesPage() {
   const [createService, { isLoading: isCreating }] = useCreateServiceMutation();
   const [updateService, { isLoading: isUpdating }] = useUpdateServiceMutation();
   const [deleteService, { isLoading: isDeleting }] = useDeleteServiceMutation();
-  const { data: servicesData, isLoading: isLoadingServices, refetch } = useGetServicesQuery({
+  const {
+    data: servicesData,
+    isLoading: isLoadingServices,
+    refetch,
+  } = useGetServicesQuery({
     page: currentPage,
     per_page: perPage,
   });
@@ -111,7 +118,10 @@ export default function ServicesPage() {
     } catch (error: any) {
       notifications.show({
         title: "Error",
-        message: error?.data?.detail || error?.data?.message || "Failed to delete service",
+        message:
+          error?.data?.detail ||
+          error?.data?.message ||
+          "Failed to delete service",
         color: "red",
       });
     }
@@ -174,9 +184,10 @@ export default function ServicesPage() {
         }
       });
 
-      const errorMessage = fieldErrors.length > 0
-        ? fieldErrors.join("\n")
-        : errorData?.detail || errorData?.message || "Failed to save service";
+      const errorMessage =
+        fieldErrors.length > 0
+          ? fieldErrors.join("\n")
+          : errorData?.detail || errorData?.message || "Failed to save service";
 
       notifications.show({
         title: "Error",
@@ -192,8 +203,12 @@ export default function ServicesPage() {
       {/* Header */}
       <Group justify="space-between" mb="xl">
         <div>
-          <Title order={2} className="text-gray-800">Services</Title>
-          <Text size="sm" c="dimmed">Manage clinic services</Text>
+          <Title order={2} className="text-gray-800">
+            Services
+          </Title>
+          <Text size="sm" c="dimmed">
+            Manage clinic services
+          </Text>
         </div>
         <Button
           leftSection={<Plus size={18} />}
@@ -252,10 +267,16 @@ export default function ServicesPage() {
                   filteredServices.map((service) => (
                     <Table.Tr key={service.id}>
                       <Table.Td>
-                        <Text size="sm" fw={600}>{service.name}</Text>
+                        <Text size="sm" fw={600}>
+                          {service.name}
+                        </Text>
                       </Table.Td>
                       <Table.Td>
-                        <Text size="sm" lineClamp={2} c={service.description ? "dark" : "dimmed"}>
+                        <Text
+                          size="sm"
+                          lineClamp={2}
+                          c={service.description ? "dark" : "dimmed"}
+                        >
                           {service.description || "No description"}
                         </Text>
                       </Table.Td>
@@ -308,31 +329,38 @@ export default function ServicesPage() {
               </Table.Tbody>
             </Table>
             {/* Pagination */}
-            {servicesData && servicesData.total_pages && servicesData.total_pages > 1 && (
-              <Group justify="space-between" mt="md">
-                <Text size="sm" c="dimmed">
-                  Page {servicesData.current_page || 1} of {servicesData.total_pages || 1}
-                </Text>
-                <Group gap="xs">
-                  <Button
-                    variant="light"
-                    size="sm"
-                    disabled={!servicesData.links?.previous}
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant="light"
-                    size="sm"
-                    disabled={!servicesData.links?.next}
-                    onClick={() => setCurrentPage((p) => Math.min(servicesData.total_pages || 1, p + 1))}
-                  >
-                    Next
-                  </Button>
+            {servicesData &&
+              servicesData.total_pages &&
+              servicesData.total_pages > 1 && (
+                <Group justify="space-between" mt="md">
+                  <Text size="sm" c="dimmed">
+                    Page {servicesData.current_page || 1} of{" "}
+                    {servicesData.total_pages || 1}
+                  </Text>
+                  <Group gap="xs">
+                    <Button
+                      variant="light"
+                      size="sm"
+                      disabled={!servicesData.links?.previous}
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="light"
+                      size="sm"
+                      disabled={!servicesData.links?.next}
+                      onClick={() =>
+                        setCurrentPage((p) =>
+                          Math.min(servicesData.total_pages || 1, p + 1)
+                        )
+                      }
+                    >
+                      Next
+                    </Button>
+                  </Group>
                 </Group>
-              </Group>
-            )}
+              )}
           </Card>
         </>
       )}
@@ -412,7 +440,9 @@ export default function ServicesPage() {
           <Stack gap="md">
             <Group>
               <div>
-                <Text size="lg" fw={600}>{selectedService.name}</Text>
+                <Text size="lg" fw={600}>
+                  {selectedService.name}
+                </Text>
                 <Badge
                   variant="light"
                   color={selectedService.is_active ? "green" : "gray"}
@@ -425,7 +455,9 @@ export default function ServicesPage() {
 
             {selectedService.description && (
               <div>
-                <Text size="sm" fw={600} mb={8}>Description</Text>
+                <Text size="sm" fw={600} mb={8}>
+                  Description
+                </Text>
                 <Card className="bg-gray-50">
                   <Text size="sm">{selectedService.description}</Text>
                 </Card>
@@ -468,7 +500,8 @@ export default function ServicesPage() {
         {serviceToDelete && (
           <Stack gap="md">
             <Text size="sm" c="dimmed">
-              Are you sure you want to delete this service? This action cannot be undone.
+              Are you sure you want to delete this service? This action cannot
+              be undone.
             </Text>
             <Card className="bg-red-50 border border-red-200" p="md">
               <Group gap="xs">

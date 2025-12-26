@@ -10,128 +10,171 @@ import {
   Group,
   Menu,
   Modal,
+  Progress,
   Select,
   Stack,
   Table,
-  Tabs,
   Text,
-  Textarea,
   TextInput,
   Title
 } from "@mantine/core";
 import { DatePickerInput } from "@mantine/dates";
 import { useDisclosure } from "@mantine/hooks";
 import {
-  AlertCircle,
   Calendar,
+  CheckCircle2,
+  Clock,
+  CreditCard,
+  DollarSign,
   Download,
-  Edit,
   Eye,
   FileText,
-  Image as ImageIcon,
   MoreVertical,
-  Pill,
-  Plus,
   Search,
-  Trash2,
-  Upload,
-  User,
+  TrendingUp,
   X
 } from "lucide-react";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useGetPatientsQuery } from "../../../shared/api/patientsApi";
 
-// Mock records data
-const mockRecords = [
+// Mock payment records data
+const mockPaymentRecords = [
   {
     id: 1,
-    patient: "Abebe Kebede",
-    patientId: "P001",
+    invoiceId: "INV-001",
     date: "2024-12-15",
-    type: "consultation",
-    diagnosis: "Root Canal Treatment Required",
-    treatment: "Root Canal Therapy initiated",
+    service: "Root Canal Treatment",
+    amount: 15000,
+    paid: 15000,
+    method: "Cash",
+    status: "paid",
     dentist: "Dr. Hilina",
-    notes: "Patient experiencing pain in lower left molar. X-ray shows infection.",
-    prescriptions: ["Amoxicillin 500mg", "Ibuprofen 400mg"],
-    attachments: 2,
-    avatar: "https://i.pravatar.cc/100?img=1",
+    notes: "Full payment received",
+    paymentHistory: [
+      { date: "2024-12-15", amount: 15000, method: "Cash" },
+    ],
   },
   {
     id: 2,
-    patient: "Tigist Alemu",
-    patientId: "P002",
-    date: "2024-12-14",
-    type: "checkup",
-    diagnosis: "Healthy - Routine Cleaning",
-    treatment: "Professional teeth cleaning completed",
+    invoiceId: "INV-002",
+    date: "2024-12-10",
+    service: "Initial Consultation",
+    amount: 2000,
+    paid: 2000,
+    method: "Bank Transfer",
+    status: "paid",
     dentist: "Dr. Hilina",
-    notes: "Regular checkup, no issues found. Patient advised on proper brushing technique.",
-    prescriptions: [],
-    attachments: 1,
-    avatar: "https://i.pravatar.cc/100?img=2",
+    notes: "Payment confirmed",
+    paymentHistory: [
+      { date: "2024-12-10", amount: 2000, method: "Bank Transfer" },
+    ],
   },
   {
     id: 3,
-    patient: "Dawit Tadesse",
-    patientId: "P003",
-    date: "2024-12-10",
-    type: "followup",
-    diagnosis: "Orthodontic Assessment",
-    treatment: "Treatment plan discussed for braces",
+    invoiceId: "INV-003",
+    date: "2024-12-08",
+    service: "Crown Preparation",
+    amount: 12000,
+    paid: 10000,
+    method: "Partial Payment",
+    status: "partial",
     dentist: "Dr. Hilina",
-    notes: "Patient interested in orthodontic treatment. Impressions taken for treatment planning.",
-    prescriptions: [],
-    attachments: 3,
-    avatar: "https://i.pravatar.cc/100?img=3",
+    notes: "Remaining: ETB 2,000",
+    paymentHistory: [
+      { date: "2024-12-08", amount: 5000, method: "Cash" },
+      { date: "2024-12-10", amount: 3000, method: "Bank Transfer" },
+      { date: "2024-12-12", amount: 2000, method: "Mobile Money" },
+    ],
+  },
+  {
+    id: 4,
+    invoiceId: "INV-004",
+    date: "2024-11-20",
+    service: "Teeth Cleaning",
+    amount: 3000,
+    paid: 3000,
+    method: "Mobile Money",
+    status: "paid",
+    dentist: "Dr. Hilina",
+    notes: "Regular cleaning service",
+    paymentHistory: [
+      { date: "2024-11-20", amount: 3000, method: "Mobile Money" },
+    ],
   },
 ];
 
-const recordTypeColors: Record<string, string> = {
-  consultation: "blue",
-  checkup: "green",
-  followup: "purple",
-  emergency: "red",
-  surgery: "orange",
+const paymentStatusColors: Record<string, string> = {
+  paid: "green",
+  partial: "yellow",
+  pending: "orange",
+  overdue: "red",
+};
+
+const paymentMethodColors: Record<string, string> = {
+  Cash: "blue",
+  "Bank Transfer": "purple",
+  "Mobile Money": "teal",
+  "Credit Card": "indigo",
+  "Partial Payment": "yellow",
 };
 
 export default function PatientRecordsPage() {
-  const [opened, { open, close }] = useDisclosure(false);
+  const searchParams = useSearchParams();
+  const patientIdParam = searchParams.get("patientId");
+
   const [viewModalOpened, { open: openView, close: closeView }] = useDisclosure(false);
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState<string | null>("all");
-  const [selectedPatient, setSelectedPatient] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string | null>("all");
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(patientIdParam);
 
-  // Filter records
-  const filteredRecords = mockRecords.filter((record) => {
+  // Fetch patients for dropdown
+  const { data: patientsData } = useGetPatientsQuery({ page: 1, per_page: 100 });
+
+  // Get selected patient info
+  const selectedPatient = patientsData?.results?.find((p: any) => p.id.toString() === selectedPatientId);
+
+  // Filter payment records (in real app, this would come from API)
+  const filteredRecords = mockPaymentRecords.filter((record) => {
     const matchesSearch =
-      record.patient.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      record.patientId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      record.diagnosis.toLowerCase().includes(searchQuery.toLowerCase());
+      record.invoiceId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      record.service.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesType = typeFilter === "all" || record.type === typeFilter;
-    const matchesPatient = !selectedPatient || record.patientId === selectedPatient;
+    const matchesStatus = statusFilter === "all" || record.status === statusFilter;
 
-    return matchesSearch && matchesType && matchesPatient;
+    return matchesSearch && matchesStatus;
   });
+
+  // Calculate payment statistics
+  const totalAmount = filteredRecords.reduce((sum, r) => sum + r.amount, 0);
+  const totalPaid = filteredRecords.reduce((sum, r) => sum + r.paid, 0);
+  const totalRemaining = totalAmount - totalPaid;
+  const paymentProgress = totalAmount > 0 ? (totalPaid / totalAmount) * 100 : 0;
 
   const handleViewRecord = (record: any) => {
     setSelectedRecord(record);
     openView();
   };
 
-  const handleEditRecord = (record: any) => {
-    setSelectedRecord(record);
-    open();
-  };
+  useEffect(() => {
+    if (patientIdParam) {
+      setSelectedPatientId(patientIdParam);
+    }
+  }, [patientIdParam]);
 
   return (
     <Box>
       {/* Header */}
       <Group justify="space-between" mb="xl">
         <div>
-          <Title order={2} className="text-gray-800">Medical Records</Title>
-          <Text size="sm" c="dimmed">Patient medical history and records</Text>
+          <Title order={2} className="text-gray-800">Payment Records</Title>
+          <Text size="sm" c="dimmed">
+            {selectedPatient
+              ? `Payment history for ${selectedPatient.profile?.user?.first_name || ""} ${selectedPatient.profile?.user?.last_name || ""}`
+              : "View patient payment history and billing information"
+            }
+          </Text>
         </div>
         <Group>
           <Button
@@ -140,23 +183,36 @@ export default function PatientRecordsPage() {
           >
             Export
           </Button>
-          <Button
-            leftSection={<Plus size={18} />}
-            className="bg-[#19b5af] hover:bg-[#14918c]"
-            onClick={open}
-          >
-            New Record
-          </Button>
         </Group>
       </Group>
 
-      {/* Stats Cards */}
+      {/* Payment Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         {[
-          { label: "Total Records", value: mockRecords.length.toString(), icon: FileText, color: "bg-blue-500" },
-          { label: "This Month", value: "12", icon: Calendar, color: "bg-green-500" },
-          { label: "With Attachments", value: mockRecords.filter(r => r.attachments > 0).length.toString(), icon: ImageIcon, color: "bg-purple-500" },
-          { label: "Prescriptions", value: "24", icon: Pill, color: "bg-yellow-500" },
+          {
+            label: "Total Invoices",
+            value: filteredRecords.length.toString(),
+            icon: FileText,
+            color: "bg-blue-500"
+          },
+          {
+            label: "Total Amount",
+            value: `ETB ${totalAmount.toLocaleString()}`,
+            icon: DollarSign,
+            color: "bg-purple-500"
+          },
+          {
+            label: "Total Paid",
+            value: `ETB ${totalPaid.toLocaleString()}`,
+            icon: CheckCircle2,
+            color: "bg-green-500"
+          },
+          {
+            label: "Remaining",
+            value: `ETB ${totalRemaining.toLocaleString()}`,
+            icon: Clock,
+            color: totalRemaining > 0 ? "bg-red-500" : "bg-gray-500"
+          },
         ].map((stat, index) => (
           <Card key={index} shadow="sm" p="md" className="border border-gray-200">
             <Group justify="space-between">
@@ -176,53 +232,41 @@ export default function PatientRecordsPage() {
       <Card shadow="sm" p="md" mb="md" className="border border-gray-200">
         <Group>
           <TextInput
-            placeholder="Search by patient, ID, or diagnosis..."
+            placeholder="Search by service..."
             leftSection={<Search size={16} />}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.currentTarget.value)}
             className="flex-1"
           />
           <Select
-            placeholder="Select Patient"
+            placeholder="Payment Status"
             data={[
-              { value: "all", label: "All Patients" },
-              ...mockRecords.map(r => ({ value: r.patientId, label: r.patient }))
+              { value: "all", label: "All Status" },
+              { value: "paid", label: "Paid" },
+              { value: "partial", label: "Partial" },
+              { value: "pending", label: "Pending" },
+              { value: "overdue", label: "Overdue" },
             ]}
-            value={selectedPatient}
-            onChange={setSelectedPatient}
+            value={statusFilter}
+            onChange={setStatusFilter}
             clearable
-            w={200}
-          />
-          <Select
-            placeholder="Record Type"
-            data={[
-              { value: "all", label: "All Types" },
-              { value: "consultation", label: "Consultation" },
-              { value: "checkup", label: "Checkup" },
-              { value: "followup", label: "Follow-up" },
-              { value: "emergency", label: "Emergency" },
-              { value: "surgery", label: "Surgery" },
-            ]}
-            value={typeFilter}
-            onChange={setTypeFilter}
-            clearable
-            w={150}
+            w={180}
           />
         </Group>
       </Card>
 
-      {/* Records Table */}
+      {/* Payment Records Table */}
       <Card shadow="sm" p="lg" className="border border-gray-200">
         <Table highlightOnHover verticalSpacing="md">
           <Table.Thead>
             <Table.Tr>
               <Table.Th>Date</Table.Th>
-              <Table.Th>Patient</Table.Th>
-              <Table.Th>Type</Table.Th>
-              <Table.Th>Diagnosis</Table.Th>
-              <Table.Th>Treatment</Table.Th>
-              <Table.Th>Dentist</Table.Th>
-              <Table.Th>Attachments</Table.Th>
+              <Table.Th>Service</Table.Th>
+              <Table.Th>Amount</Table.Th>
+              <Table.Th>Paid</Table.Th>
+              <Table.Th>Remaining</Table.Th>
+              <Table.Th>Progress</Table.Th>
+              <Table.Th>Status</Table.Th>
               <Table.Th>Actions</Table.Th>
             </Table.Tr>
           </Table.Thead>
@@ -231,244 +275,106 @@ export default function PatientRecordsPage() {
               <Table.Tr>
                 <Table.Td colSpan={8}>
                   <Text ta="center" py="xl" c="dimmed">
-                    No records found
+                    No payment records found
                   </Text>
                 </Table.Td>
               </Table.Tr>
             ) : (
-              filteredRecords.map((record) => (
-                <Table.Tr key={record.id}>
-                  <Table.Td>
-                    <Group gap={6}>
-                      <Calendar size={14} className="text-gray-400" />
-                      <Text size="xs">{record.date}</Text>
-                    </Group>
-                  </Table.Td>
-                  <Table.Td>
-                    <Group gap="xs">
-                      <Avatar src={record.avatar} size={40} radius="xl" />
-                      <div>
-                        <Text size="sm" fw={500}>{record.patient}</Text>
-                        <Badge variant="light" color="gray" size="xs">{record.patientId}</Badge>
-                      </div>
-                    </Group>
-                  </Table.Td>
-                  <Table.Td>
-                    <Badge
-                      variant="light"
-                      color={recordTypeColors[record.type]}
-                      size="sm"
-                      className="capitalize"
-                    >
-                      {record.type}
-                    </Badge>
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="sm" lineClamp={1}>{record.diagnosis}</Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="sm" lineClamp={1}>{record.treatment}</Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="sm">{record.dentist}</Text>
-                  </Table.Td>
-                  <Table.Td>
-                    {record.attachments > 0 ? (
+              filteredRecords.map((record) => {
+                const remaining = record.amount - record.paid;
+                const progressPercent = record.amount > 0 ? (record.paid / record.amount) * 100 : 0;
+                return (
+                  <Table.Tr key={record.id}>
+                    <Table.Td>
                       <Group gap={6}>
-                        <ImageIcon size={14} className="text-gray-400" />
-                        <Text size="xs">{record.attachments}</Text>
+                        <Calendar size={14} className="text-gray-400" />
+                        <Text size="xs">{record.date}</Text>
                       </Group>
-                    ) : (
-                      <Text size="xs" c="dimmed">None</Text>
-                    )}
-                  </Table.Td>
-                  <Table.Td>
-                    <Group gap="xs">
-                      <ActionIcon
-                        variant="light"
-                        color="blue"
-                        onClick={() => handleViewRecord(record)}
+                    </Table.Td>
+                    <Table.Td>
+                      <Text size="sm" fw={500}>{record.service}</Text>
+                    </Table.Td>
+                    <Table.Td>
+                      <Text size="sm" fw={600}>ETB {record.amount.toLocaleString()}</Text>
+                    </Table.Td>
+                    <Table.Td>
+                      <Text size="sm" className="text-green-600" fw={500}>
+                        ETB {record.paid.toLocaleString()}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td>
+                      <Text
+                        size="sm"
+                        className={remaining > 0 ? "text-red-600" : "text-gray-600"}
+                        fw={500}
                       >
-                        <Eye size={16} />
-                      </ActionIcon>
-                      <ActionIcon
+                        ETB {remaining.toLocaleString()}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td>
+                      <div style={{ minWidth: 100 }}>
+                        <Progress
+                          value={progressPercent}
+                          color={progressPercent === 100 ? "green" : progressPercent >= 50 ? "blue" : "yellow"}
+                          size="sm"
+                          radius="xl"
+                        />
+                        <Text size="xs" c="dimmed" mt={4} ta="center">
+                          {progressPercent.toFixed(0)}%
+                        </Text>
+                      </div>
+                    </Table.Td>
+                    <Table.Td>
+                      <Badge
                         variant="light"
-                        color="teal"
-                        onClick={() => handleEditRecord(record)}
+                        color={paymentStatusColors[record.status]}
+                        size="sm"
+                        className="capitalize"
                       >
-                        <Edit size={16} />
-                      </ActionIcon>
-                      <Menu shadow="md" width={200}>
-                        <Menu.Target>
-                          <ActionIcon variant="light" color="gray">
-                            <MoreVertical size={16} />
-                          </ActionIcon>
-                        </Menu.Target>
-                        <Menu.Dropdown>
-                          <Menu.Item leftSection={<Download size={16} />}>
-                            Download PDF
-                          </Menu.Item>
-                          <Menu.Item leftSection={<ImageIcon size={16} />}>
-                            View Attachments
-                          </Menu.Item>
-                          <Menu.Divider />
-                          <Menu.Item leftSection={<Trash2 size={16} />} color="red">
-                            Delete
-                          </Menu.Item>
-                        </Menu.Dropdown>
-                      </Menu>
-                    </Group>
-                  </Table.Td>
-                </Table.Tr>
-              ))
+                        {record.status}
+                      </Badge>
+                    </Table.Td>
+                    <Table.Td>
+                      <Group gap="xs">
+                        <ActionIcon
+                          variant="light"
+                          color="blue"
+                          onClick={() => handleViewRecord(record)}
+                        >
+                          <Eye size={16} />
+                        </ActionIcon>
+                        <Menu shadow="md" width={200}>
+                          <Menu.Target>
+                            <ActionIcon variant="light" color="gray">
+                              <MoreVertical size={16} />
+                            </ActionIcon>
+                          </Menu.Target>
+                          <Menu.Dropdown>
+                            <Menu.Item leftSection={<Download size={16} />}>
+                              Download Invoice
+                            </Menu.Item>
+                            <Menu.Item leftSection={<FileText size={16} />}>
+                              View Details
+                            </Menu.Item>
+                          </Menu.Dropdown>
+                        </Menu>
+                      </Group>
+                    </Table.Td>
+                  </Table.Tr>
+                );
+              })
             )}
           </Table.Tbody>
         </Table>
       </Card>
 
-      {/* Add/Edit Record Modal */}
-      <Modal
-        opened={opened}
-        onClose={() => {
-          close();
-          setSelectedRecord(null);
-        }}
-        title={
-          <Text fw={600} size="lg">
-            {selectedRecord ? "Edit Medical Record" : "New Medical Record"}
-          </Text>
-        }
-        size="xl"
-      >
-        <Stack gap="md">
-          <Tabs defaultValue="basic">
-            <Tabs.List>
-              <Tabs.Tab value="basic" leftSection={<FileText size={16} />}>
-                Basic Info
-              </Tabs.Tab>
-              <Tabs.Tab value="clinical" leftSection={<AlertCircle size={16} />}>
-                Clinical Details
-              </Tabs.Tab>
-              <Tabs.Tab value="attachments" leftSection={<Upload size={16} />}>
-                Attachments
-              </Tabs.Tab>
-            </Tabs.List>
-
-            <Tabs.Panel value="basic" pt="md">
-              <Stack gap="md">
-                <Select
-                  label="Patient"
-                  placeholder="Select patient"
-                  required
-                  data={mockRecords.map(r => ({ value: r.patientId, label: r.patient }))}
-                  leftSection={<User size={16} />}
-                  defaultValue={selectedRecord?.patientId}
-                />
-                <Group grow>
-                  <DatePickerInput
-                    label="Visit Date"
-                    placeholder="Select date"
-                    required
-                    leftSection={<Calendar size={16} />}
-                  />
-                  <Select
-                    label="Record Type"
-                    placeholder="Select type"
-                    required
-                    data={[
-                      { value: "consultation", label: "Consultation" },
-                      { value: "checkup", label: "Checkup" },
-                      { value: "followup", label: "Follow-up" },
-                      { value: "emergency", label: "Emergency" },
-                      { value: "surgery", label: "Surgery" },
-                    ]}
-                    defaultValue={selectedRecord?.type}
-                  />
-                </Group>
-                <Select
-                  label="Dentist"
-                  placeholder="Select dentist"
-                  required
-                  data={["Dr. Hilina", "Dr. John", "Dr. Sarah"]}
-                  defaultValue={selectedRecord?.dentist}
-                />
-              </Stack>
-            </Tabs.Panel>
-
-            <Tabs.Panel value="clinical" pt="md">
-              <Stack gap="md">
-                <TextInput
-                  label="Chief Complaint"
-                  placeholder="Patient's main complaint"
-                  required
-                />
-                <Textarea
-                  label="Diagnosis"
-                  placeholder="Enter diagnosis details"
-                  required
-                  rows={3}
-                  defaultValue={selectedRecord?.diagnosis}
-                />
-                <Textarea
-                  label="Treatment Provided"
-                  placeholder="Describe treatment"
-                  required
-                  rows={3}
-                  defaultValue={selectedRecord?.treatment}
-                />
-                <Textarea
-                  label="Clinical Notes"
-                  placeholder="Additional notes and observations"
-                  rows={4}
-                  defaultValue={selectedRecord?.notes}
-                />
-                <TextInput
-                  label="Prescriptions"
-                  placeholder="Medications prescribed (comma separated)"
-                  leftSection={<Pill size={16} />}
-                />
-              </Stack>
-            </Tabs.Panel>
-
-            <Tabs.Panel value="attachments" pt="md">
-              <Stack gap="md">
-                <Card className="border-2 border-dashed border-gray-300 hover:border-[#19b5af] transition-colors cursor-pointer">
-                  <Group justify="center" py="xl">
-                    <Upload size={32} className="text-gray-400" />
-                    <div className="text-center">
-                      <Text size="sm" fw={500}>Click to upload or drag and drop</Text>
-                      <Text size="xs" c="dimmed">X-rays, photos, documents (Max 10MB)</Text>
-                    </div>
-                  </Group>
-                </Card>
-                <Text size="xs" c="dimmed">
-                  Supported formats: JPG, PNG, PDF, DICOM
-                </Text>
-              </Stack>
-            </Tabs.Panel>
-          </Tabs>
-
-          <Group justify="flex-end" mt="md">
-            <Button variant="light" onClick={() => {
-              close();
-              setSelectedRecord(null);
-            }}>
-              Cancel
-            </Button>
-            <Button className="bg-[#19b5af] hover:bg-[#14918c]">
-              {selectedRecord ? "Update" : "Create"} Record
-            </Button>
-          </Group>
-        </Stack>
-      </Modal>
-
-      {/* View Record Modal */}
+      {/* View Payment Record Modal */}
       <Modal
         opened={viewModalOpened}
         onClose={closeView}
         title={
           <Text fw={600} size="lg">
-            Medical Record Details
+            Payment Record Details
           </Text>
         }
         size="lg"
@@ -476,27 +382,26 @@ export default function PatientRecordsPage() {
         {selectedRecord && (
           <Stack gap="md">
             <Group justify="space-between">
-              <Group>
-                <Avatar src={selectedRecord.avatar} size={60} radius="xl" />
-                <div>
-                  <Text size="lg" fw={600}>{selectedRecord.patient}</Text>
-                  <Badge variant="light" color="gray">{selectedRecord.patientId}</Badge>
-                </div>
-              </Group>
+              <div>
+                <Text size="lg" fw={600}>{selectedRecord.service}</Text>
+                <Badge variant="light" color="gray" mt={4}>
+                  {selectedRecord.invoiceId}
+                </Badge>
+              </div>
               <Badge
                 variant="light"
-                color={recordTypeColors[selectedRecord.type]}
+                color={paymentStatusColors[selectedRecord.status]}
                 size="lg"
                 className="capitalize"
               >
-                {selectedRecord.type}
+                {selectedRecord.status}
               </Badge>
             </Group>
 
             <Card className="bg-gray-50">
               <Group grow>
                 <div>
-                  <Text size="xs" c="dimmed" mb={4}>Visit Date</Text>
+                  <Text size="xs" c="dimmed" mb={4}>Payment Date</Text>
                   <Group gap={6}>
                     <Calendar size={16} className="text-gray-400" />
                     <Text size="sm" fw={500}>{selectedRecord.date}</Text>
@@ -510,35 +415,56 @@ export default function PatientRecordsPage() {
             </Card>
 
             <div>
-              <Text size="sm" fw={600} mb={4}>Diagnosis</Text>
-              <Card className="bg-blue-50 border border-blue-200">
-                <Text size="sm">{selectedRecord.diagnosis}</Text>
-              </Card>
+              <Text size="sm" fw={600} mb={8}>Payment Breakdown</Text>
+              <Stack gap={8}>
+                <Group justify="space-between">
+                  <Text size="sm" c="dimmed">Total Amount:</Text>
+                  <Text size="sm" fw={600}>ETB {selectedRecord.amount.toLocaleString()}</Text>
+                </Group>
+                <Group justify="space-between">
+                  <Text size="sm" c="dimmed">Amount Paid:</Text>
+                  <Text size="sm" fw={600} className="text-green-600">
+                    ETB {selectedRecord.paid.toLocaleString()}
+                  </Text>
+                </Group>
+                <Group justify="space-between">
+                  <Text size="sm" c="dimmed">Remaining:</Text>
+                  <Text
+                    size="sm"
+                    fw={600}
+                    className={selectedRecord.amount - selectedRecord.paid > 0 ? "text-red-600" : "text-gray-600"}
+                  >
+                    ETB {(selectedRecord.amount - selectedRecord.paid).toLocaleString()}
+                  </Text>
+                </Group>
+                <Progress
+                  value={(selectedRecord.paid / selectedRecord.amount) * 100}
+                  color={selectedRecord.paid === selectedRecord.amount ? "green" : "yellow"}
+                  size="md"
+                  radius="xl"
+                  mt={8}
+                />
+              </Stack>
             </div>
 
-            <div>
-              <Text size="sm" fw={600} mb={4}>Treatment Provided</Text>
-              <Card className="bg-green-50 border border-green-200">
-                <Text size="sm">{selectedRecord.treatment}</Text>
-              </Card>
-            </div>
-
-            <div>
-              <Text size="sm" fw={600} mb={4}>Clinical Notes</Text>
-              <Card className="bg-gray-50">
-                <Text size="sm">{selectedRecord.notes}</Text>
-              </Card>
-            </div>
-
-            {selectedRecord.prescriptions.length > 0 && (
+            {/* Payment History */}
+            {selectedRecord.paymentHistory && selectedRecord.paymentHistory.length > 0 && (
               <div>
-                <Text size="sm" fw={600} mb={4}>Prescriptions</Text>
+                <Text size="sm" fw={600} mb={8}>Payment History</Text>
                 <Stack gap={8}>
-                  {selectedRecord.prescriptions.map((prescription: string, index: number) => (
-                    <Card key={index} className="bg-purple-50 border border-purple-200">
-                      <Group gap={8}>
-                        <Pill size={16} className="text-purple-600" />
-                        <Text size="sm">{prescription}</Text>
+                  {selectedRecord.paymentHistory.map((payment: any, index: number) => (
+                    <Card key={index} className="bg-gray-50 border border-gray-200">
+                      <Group justify="space-between">
+                        <Group gap={8}>
+                          <Calendar size={16} className="text-gray-400" />
+                          <div>
+                            <Text size="sm" fw={500}>{payment.date}</Text>
+                            <Text size="xs" c="dimmed">{payment.method}</Text>
+                          </div>
+                        </Group>
+                        <Text size="sm" fw={600} className="text-green-600">
+                          ETB {payment.amount.toLocaleString()}
+                        </Text>
                       </Group>
                     </Card>
                   ))}
@@ -546,36 +472,21 @@ export default function PatientRecordsPage() {
               </div>
             )}
 
-            {selectedRecord.attachments > 0 && (
+            {selectedRecord.notes && (
               <div>
-                <Text size="sm" fw={600} mb={4}>Attachments</Text>
+                <Text size="sm" fw={600} mb={4}>Notes</Text>
                 <Card className="bg-gray-50">
-                  <Group gap={8}>
-                    <ImageIcon size={16} className="text-gray-400" />
-                    <Text size="sm">{selectedRecord.attachments} file(s) attached</Text>
-                    <Button variant="subtle" size="xs" leftSection={<Eye size={14} />}>
-                      View
-                    </Button>
-                  </Group>
+                  <Text size="sm">{selectedRecord.notes}</Text>
                 </Card>
               </div>
             )}
 
             <Group justify="flex-end" mt="md">
               <Button variant="light" leftSection={<Download size={16} />}>
-                Download PDF
+                Download Invoice
               </Button>
               <Button variant="light" onClick={closeView}>
                 Close
-              </Button>
-              <Button
-                className="bg-[#19b5af] hover:bg-[#14918c]"
-                onClick={() => {
-                  closeView();
-                  handleEditRecord(selectedRecord);
-                }}
-              >
-                Edit Record
               </Button>
             </Group>
           </Stack>

@@ -23,8 +23,11 @@ const menuItems = [
   {
     icon: IconUsers,
     label: "Patients",
-    link: "/patients/list",
     category: "Clinical",
+    subItems: [
+      { label: "Patient List", link: "/patients/list" },
+      { label: "Patient Records", link: "/patients/records" },
+    ],
   },
   {
     icon: IconStethoscope,
