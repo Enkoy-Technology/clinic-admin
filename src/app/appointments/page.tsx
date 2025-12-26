@@ -30,6 +30,7 @@ import {
   ChevronRight,
   Clock,
   Edit,
+  Eye,
   Mail,
   MessageSquare,
   Phone,
@@ -37,6 +38,7 @@ import {
   Trash2,
   UserPlus,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import {
   useCreateAppointmentMutation,
@@ -121,6 +123,7 @@ const mockReminders = [
 ];
 
 export default function AppointmentsPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<string>("daily");
   const [bookModalOpened, { open: openBook, close: closeBook }] = useDisclosure(false);
   const [editModalOpened, { open: openEdit, close: closeEdit }] = useDisclosure(false);
@@ -474,10 +477,10 @@ export default function AppointmentsPage() {
         updatePayload.notes = values.notes;
       }
 
-      await updateAppointment({
-        id: editingAppointment.id,
+        await updateAppointment({
+          id: editingAppointment.id,
         data: updatePayload,
-      }).unwrap();
+        }).unwrap();
 
       notifications.show({
         title: "Success",
@@ -485,8 +488,8 @@ export default function AppointmentsPage() {
         color: "green",
       });
 
-      refetch();
-      closeEdit();
+        refetch();
+        closeEdit();
       setEditingAppointment(null);
       editForm.reset();
     } catch (error: any) {
@@ -541,7 +544,7 @@ export default function AppointmentsPage() {
     const compareDate = new Date(newDate);
     compareDate.setHours(0, 0, 0, 0);
     if (compareDate >= today) {
-      setSelectedDate(newDate);
+    setSelectedDate(newDate);
     }
   };
 
@@ -671,9 +674,9 @@ export default function AppointmentsPage() {
           leftSection={<UserPlus size={24} />}
           onClick={handleAddAppointment}
         >
-          <Text size="lg" fw={700}>
+            <Text size="lg" fw={700}>
             Add Appointment
-          </Text>
+            </Text>
         </Button>
       </div>
 
@@ -707,20 +710,20 @@ export default function AppointmentsPage() {
       {/* Date Navigation */}
       <Card shadow="sm" p="md" mb="lg" className="border border-gray-200">
         <Group justify="space-between">
+          <Button variant="light" onClick={goToToday} size="sm">
+            Today
+          </Button>
           <Group>
             <ActionIcon size="lg" variant="light" onClick={goToPreviousDay}>
               <ChevronLeft size={20} />
             </ActionIcon>
-            <Button variant="light" onClick={goToToday} size="sm">
-              Today
-            </Button>
+            <Text size="lg" fw={600}>
+              {formatDate(selectedDate)}
+            </Text>
             <ActionIcon size="lg" variant="light" onClick={goToNextDay}>
               <ChevronRight size={20} />
             </ActionIcon>
           </Group>
-              <Text size="lg" fw={600}>
-                {formatDate(selectedDate)}
-              </Text>
         </Group>
       </Card>
 
@@ -786,19 +789,19 @@ export default function AppointmentsPage() {
                       <Group gap={4}>
                         {isAppointmentInFuture(appointment) && (
                           <>
-                            <ActionIcon
-                              size="sm"
-                              variant="light"
-                              color="blue"
-                              onClick={() => handleEditAppointment(time, appointment)}
-                              title="Edit"
+                        <ActionIcon
+                          size="sm"
+                          variant="light"
+                          color="blue"
+                          onClick={() => handleEditAppointment(time, appointment)}
+                          title="Edit"
                               disabled={isUpdatingAppointment || isDeletingAppointment}
-                            >
-                              <Edit size={14} />
-                            </ActionIcon>
-                            <ActionIcon
-                              size="sm"
-                              variant="light"
+                        >
+                          <Edit size={14} />
+                        </ActionIcon>
+                        <ActionIcon
+                          size="sm"
+                          variant="light"
                               color="red"
                               onClick={() => handleDeleteAppointment(time)}
                               title="Delete"
@@ -806,17 +809,22 @@ export default function AppointmentsPage() {
                               disabled={deletingAppointmentId === appointment.id || isDeletingAppointment}
                             >
                               <Trash2 size={14} />
-                            </ActionIcon>
+                        </ActionIcon>
                           </>
                         )}
                         <ActionIcon
                           size="sm"
                           variant="light"
-                          color="green"
-                          onClick={() => (window.location.href = `tel:${appointment.phone}`)}
-                          title="Call"
+                          color="teal"
+                          onClick={() => {
+                            const patientId = appointment.patientId || appointment.patient?.id || appointment.patient?.patient_id;
+                            if (patientId) {
+                              router.push(`/patients/${patientId}`);
+                            }
+                          }}
+                          title="View Patient Details"
                         >
-                          <Phone size={14} />
+                          <Eye size={14} />
                         </ActionIcon>
                       </Group>
                     </div>
