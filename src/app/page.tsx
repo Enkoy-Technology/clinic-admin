@@ -1,42 +1,57 @@
 "use client";
 
 import {
-    ActionIcon,
-    Avatar,
-    Badge,
-    Box,
-    Button,
-    Card,
-    Group,
-    Progress,
-    Stack,
-    Text,
-    Title
+  ActionIcon,
+  Avatar,
+  Badge,
+  Box,
+  Button,
+  Card,
+  Group,
+  Stack,
+  Text,
+  Title
 } from "@mantine/core";
 import {
-    ArrowDownRight,
-    ArrowUpRight,
-    Calendar,
-    Clock,
-    DollarSign,
-    Eye,
-    MoreVertical,
-    Phone,
-    TrendingDown,
-    TrendingUp,
-    User,
-    Users
+  ArrowDownRight,
+  ArrowUpRight,
+  Calendar,
+  Clock,
+  Eye,
+  MessageSquare,
+  MoreVertical,
+  Star,
+  TrendingUp,
+  Users
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useGetMessagesQuery, useGetUnreadMessagesQuery } from "../shared/api/messagesApi";
 
 // Mock data
 const statsData = [
   {
-    title: "Today's Appointments",
-    value: "12",
-    change: "+2",
+    title: "New Patients",
+    value: "48",
+    change: "+12",
+    trend: "up",
+    icon: TrendingUp,
+    color: "bg-blue-500",
+  },
+  {
+    title: "Completed",
+    value: "124",
+    change: "+8",
     trend: "up",
     icon: Calendar,
-    color: "bg-blue-500",
+    color: "bg-green-500",
+  },
+  {
+    title: "Unread Messages",
+    value: "5",
+    change: "+2",
+    trend: "up",
+    icon: MessageSquare,
+    color: "bg-purple-500",
   },
   {
     title: "Total Patients",
@@ -44,22 +59,6 @@ const statsData = [
     change: "+48",
     trend: "up",
     icon: Users,
-    color: "bg-green-500",
-  },
-  {
-    title: "Revenue (This Month)",
-    value: "ETB 284,500",
-    change: "+12.5%",
-    trend: "up",
-    icon: DollarSign,
-    color: "bg-purple-500",
-  },
-  {
-    title: "Pending Appointments",
-    value: "8",
-    change: "-3",
-    trend: "down",
-    icon: Clock,
     color: "bg-yellow-500",
   },
 ];
@@ -120,12 +119,6 @@ const upcomingAppointments = [
   },
 ];
 
-const serviceStats = [
-  { name: "General Checkup", count: 45, percentage: 35, color: "blue" },
-  { name: "Teeth Cleaning", count: 38, percentage: 30, color: "green" },
-  { name: "Root Canal", count: 25, percentage: 20, color: "purple" },
-  { name: "Orthodontics", count: 19, percentage: 15, color: "yellow" },
-];
 
 const statusColors: Record<string, string> = {
   confirmed: "green",
@@ -135,6 +128,20 @@ const statusColors: Record<string, string> = {
 };
 
 export default function DashboardPage() {
+  const { data: unreadMessages } = useGetUnreadMessagesQuery();
+  const unreadCount = unreadMessages?.count || 0;
+
+  // Update stats data with real unread messages count
+  const updatedStatsData = statsData.map((stat) => {
+    if (stat.title === "Unread Messages") {
+      return {
+        ...stat,
+        value: unreadCount.toString(),
+      };
+    }
+    return stat;
+  });
+
   return (
     <Box>
       {/* Header */}
@@ -143,19 +150,19 @@ export default function DashboardPage() {
           <Title order={2} className="text-gray-800">Dashboard</Title>
           <Text size="sm" c="dimmed">Welcome back, Dr. Hilina! Here's what's happening today.</Text>
         </div>
-        <Group>
+        {/* <Group>
           <Button variant="light" leftSection={<Calendar size={18} />}>
             Schedule
           </Button>
           <Button className="bg-[#19b5af] hover:bg-[#14918c]" leftSection={<User size={18} />}>
             New Patient
           </Button>
-        </Group>
+        </Group> */}
       </Group>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        {statsData.map((stat, index) => (
+        {updatedStatsData.map((stat, index) => (
           <Card key={index} shadow="sm" p="lg" className="border border-gray-200 hover:shadow-md transition-shadow">
             <Group justify="space-between" mb="md">
               <div className={`${stat.color} p-3 rounded-lg`}>
@@ -257,124 +264,194 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Popular Services */}
-        <Card shadow="sm" p="lg" className="border border-gray-200">
-          <Group justify="space-between" mb="lg">
-            <Title order={4}>Popular Services</Title>
-            <Text size="sm" c="dimmed">This Month</Text>
-          </Group>
+      {/* Messages */}
+      <MessagesSection />
 
-          <Stack gap="lg">
-            {serviceStats.map((service, index) => (
-              <div key={index}>
-                <Group justify="space-between" mb={8}>
-                  <Text size="sm" fw={500}>{service.name}</Text>
-                  <Text size="sm" c="dimmed">{service.count} appointments</Text>
-                </Group>
-                <Progress
-                  value={service.percentage}
-                  color={service.color}
-                  size="md"
-                  radius="xl"
-                />
-              </div>
-            ))}
-          </Stack>
-        </Card>
+      {/* Feedbacks Section */}
+      <FeedbacksSection />
+    </Box>
+  );
+}
 
-        {/* Quick Stats */}
-        <Card shadow="sm" p="lg" className="border border-gray-200">
-          <Group justify="space-between" mb="lg">
-            <Title order={4}>Quick Stats</Title>
-            <ActionIcon variant="light">
-              <MoreVertical size={16} />
-            </ActionIcon>
-          </Group>
+// Messages Section Component
+function MessagesSection() {
+  const router = useRouter();
+  const { data: unreadMessages, isLoading: isLoadingMessages } = useGetUnreadMessagesQuery({ page_size: 5 });
+  const { data: recentMessages } = useGetMessagesQuery({ page_size: 5 });
 
-          <div className="grid grid-cols-2 gap-4">
-            <Card className="bg-blue-50 border border-blue-200">
-              <Group gap={8} mb={8}>
-                <TrendingUp size={20} className="text-blue-600" />
-                <Text size="xs" c="dimmed">New Patients</Text>
-              </Group>
-              <Text size="xl" fw={700} className="text-blue-600">48</Text>
-              <Text size="xs" c="dimmed" mt={4}>This month</Text>
-            </Card>
+  const unreadCount = unreadMessages?.count || 0;
+  const messages = recentMessages?.results || [];
 
-            <Card className="bg-green-50 border border-green-200">
-              <Group gap={8} mb={8}>
-                <Calendar size={20} className="text-green-600" />
-                <Text size="xs" c="dimmed">Completed</Text>
-              </Group>
-              <Text size="xl" fw={700} className="text-green-600">124</Text>
-              <Text size="xs" c="dimmed" mt={4}>This month</Text>
-            </Card>
-
-            <Card className="bg-purple-50 border border-purple-200">
-              <Group gap={8} mb={8}>
-                <Phone size={20} className="text-purple-600" />
-                <Text size="xs" c="dimmed">Calls Made</Text>
-              </Group>
-              <Text size="xl" fw={700} className="text-purple-600">89</Text>
-              <Text size="xs" c="dimmed" mt={4}>This week</Text>
-            </Card>
-
-            <Card className="bg-yellow-50 border border-yellow-200">
-              <Group gap={8} mb={8}>
-                <TrendingDown size={20} className="text-yellow-600" />
-                <Text size="xs" c="dimmed">Cancellations</Text>
-              </Group>
-              <Text size="xl" fw={700} className="text-yellow-600">12</Text>
-              <Text size="xs" c="dimmed" mt={4}>This month</Text>
-            </Card>
-          </div>
-
-          <Card className="bg-[#19b5af]/5 border border-[#19b5af]/20 mt-4">
-            <Group justify="space-between" mb={8}>
-              <Text size="sm" fw={600} className="text-[#19b5af]">Patient Satisfaction</Text>
-              <Text size="xl" fw={700} className="text-[#19b5af]">4.9/5</Text>
-            </Group>
-            <Progress value={98} color="teal" size="sm" radius="xl" />
-            <Text size="xs" c="dimmed" mt={8}>Based on 248 reviews</Text>
-          </Card>
-        </Card>
-      </div>
-
-      {/* Revenue Overview */}
-      <Card shadow="sm" p="lg" className="border border-gray-200">
-        <Group justify="space-between" mb="lg">
-          <div>
-            <Title order={4}>Revenue Overview</Title>
-            <Text size="sm" c="dimmed">December 2024</Text>
-          </div>
-          <Group>
-            <Button variant="light" size="sm">Week</Button>
-            <Button variant="light" size="sm">Month</Button>
-            <Button size="sm" className="bg-[#19b5af] hover:bg-[#14918c]">Year</Button>
-          </Group>
+  return (
+    <Card shadow="sm" p="lg" className="border border-gray-200">
+      <Group justify="space-between" mb="lg">
+        <Group>
+          <Title order={4}>Messages</Title>
+          {unreadCount > 0 && (
+            <Badge variant="filled" color="red" size="sm">
+              {unreadCount} unread
+            </Badge>
+          )}
         </Group>
+        <Button
+          variant="light"
+          size="sm"
+          leftSection={<MessageSquare size={16} />}
+          onClick={() => router.push("/messages")}
+        >
+          View All
+        </Button>
+      </Group>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {[
-            { label: "Week 1", amount: "ETB 68,500", percentage: 85 },
-            { label: "Week 2", amount: "ETB 72,300", percentage: 92 },
-            { label: "Week 3", amount: "ETB 65,200", percentage: 78 },
-            { label: "Week 4", amount: "ETB 78,500", percentage: 95 },
-          ].map((week, index) => (
-            <Card key={index} className="bg-gray-50">
-              <Text size="xs" c="dimmed" mb={8}>{week.label}</Text>
-              <Text size="lg" fw={700} mb={12}>{week.amount}</Text>
-              <Progress
-                value={week.percentage}
-                color="teal"
-                size="md"
-                radius="xl"
-              />
+      {isLoadingMessages ? (
+        <Text size="sm" c="dimmed" ta="center" py="md">Loading messages...</Text>
+      ) : messages.length === 0 ? (
+        <Text size="sm" c="dimmed" ta="center" py="md">No messages</Text>
+      ) : (
+        <Stack gap="sm">
+          {messages.slice(0, 5).map((message: any) => (
+            <Card
+              key={message.id}
+              className={`border transition-colors ${
+                !message.is_read
+                  ? "bg-blue-50 border-blue-200 hover:bg-blue-100"
+                  : "bg-gray-50 border-gray-200 hover:bg-gray-100"
+              }`}
+            >
+              <Group justify="space-between" align="flex-start">
+                <div className="flex-1">
+                  <Group gap="xs" mb={4}>
+                    <Text size="sm" fw={600}>
+                      {message.name}
+                    </Text>
+                    {!message.is_read && (
+                      <Badge size="xs" color="blue" variant="dot">New</Badge>
+                    )}
+                  </Group>
+                  <Text size="xs" c="dimmed" mb={4}>
+                    {message.phone_number}
+                  </Text>
+                  <Text size="sm" lineClamp={2}>
+                    {message.message}
+                  </Text>
+                  <Text size="xs" c="dimmed" mt={4}>
+                    {new Date(message.created_at).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </Text>
+                </div>
+              </Group>
             </Card>
           ))}
+        </Stack>
+      )}
+    </Card>
+  );
+}
+
+// Feedbacks Section Component
+function FeedbacksSection() {
+  // Mock feedbacks data - replace with real API when available
+  const mockFeedbacks = [
+    {
+      id: 1,
+      patient: "Abebe Kebede",
+      rating: 5,
+      comment: "Excellent service! The staff was very professional and the treatment was painless.",
+      date: "2024-12-15",
+      service: "Root Canal Treatment",
+    },
+    {
+      id: 2,
+      patient: "Tigist Alemu",
+      rating: 4,
+      comment: "Good experience overall. Clean facility and friendly staff.",
+      date: "2024-12-14",
+      service: "Teeth Cleaning",
+    },
+    {
+      id: 3,
+      patient: "Dawit Tadesse",
+      rating: 5,
+      comment: "Best dental clinic in town! Highly recommend.",
+      date: "2024-12-13",
+      service: "Orthodontics",
+    },
+    {
+      id: 4,
+      patient: "Meron Hailu",
+      rating: 4,
+      comment: "Very satisfied with the treatment. Will come back for follow-up.",
+      date: "2024-12-12",
+      service: "Cosmetic Dentistry",
+    },
+  ];
+
+  const averageRating = mockFeedbacks.reduce((sum, f) => sum + f.rating, 0) / mockFeedbacks.length;
+
+  return (
+    <Card shadow="sm" p="lg" className="border border-gray-200">
+      <Group justify="space-between" mb="lg">
+        <div>
+          <Title order={4}>Recent Feedbacks</Title>
+          <Text size="sm" c="dimmed">Patient reviews and ratings</Text>
         </div>
-      </Card>
-    </Box>
+        <Group gap="xs">
+          <Star size={20} className="text-yellow-500 fill-yellow-500" />
+          <Text size="lg" fw={700}>
+            {averageRating.toFixed(1)}
+          </Text>
+          <Text size="sm" c="dimmed">
+            ({mockFeedbacks.length} reviews)
+          </Text>
+        </Group>
+      </Group>
+
+      <Stack gap="md">
+        {mockFeedbacks.map((feedback) => (
+          <Card key={feedback.id} className="bg-gray-50 border border-gray-200">
+            <Group justify="space-between" align="flex-start" mb="xs">
+              <div className="flex-1">
+                <Group gap="xs" mb={4}>
+                  <Text size="sm" fw={600}>
+                    {feedback.patient}
+                  </Text>
+                  <Group gap={4}>
+                    {[...Array(5)].map((_, i) => (
+                      <Star
+                        key={i}
+                        size={14}
+                        className={
+                          i < feedback.rating
+                            ? "text-yellow-500 fill-yellow-500"
+                            : "text-gray-300"
+                        }
+                      />
+                    ))}
+                  </Group>
+                </Group>
+                <Text size="xs" c="dimmed" mb={4}>
+                  {feedback.service} • {new Date(feedback.date).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </Text>
+                <Text size="sm" lineClamp={2}>
+                  {feedback.comment}
+                </Text>
+              </div>
+            </Group>
+          </Card>
+        ))}
+      </Stack>
+
+      <Button variant="light" fullWidth mt="md" className="hover:bg-[#19b5af]/10">
+        View All Feedbacks
+      </Button>
+    </Card>
   );
 }
