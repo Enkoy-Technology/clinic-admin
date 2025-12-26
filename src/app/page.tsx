@@ -8,6 +8,7 @@ import {
   Button,
   Card,
   Group,
+  Loader,
   Stack,
   Text,
   Title
@@ -25,122 +26,113 @@ import {
   Users
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useGetMessagesQuery, useGetUnreadMessagesQuery } from "../shared/api/messagesApi";
+import { useGetDashboardQuery } from "../shared/api/dashboardApi";
 
-// Mock data
-const statsData = [
-  {
-    title: "New Patients",
-    value: "48",
-    change: "+12",
-    trend: "up",
-    icon: TrendingUp,
-    color: "bg-blue-500",
-  },
-  {
-    title: "Completed",
-    value: "124",
-    change: "+8",
-    trend: "up",
-    icon: Calendar,
-    color: "bg-green-500",
-  },
-  {
-    title: "Unread Messages",
-    value: "5",
-    change: "+2",
-    trend: "up",
-    icon: MessageSquare,
-    color: "bg-purple-500",
-  },
-  {
-    title: "Total Patients",
-    value: "1,248",
-    change: "+48",
-    trend: "up",
-    icon: Users,
-    color: "bg-yellow-500",
-  },
-];
+// Helper function to convert 24-hour to 12-hour format
+const convertTo12Hour = (time24: string) => {
+  if (!time24) {
+    const [hours, minutes] = time24.split(":");
+    if (hours && minutes) {
+      const hour = parseInt(hours);
+      const ampm = hour >= 12 ? "PM" : "AM";
+      const hour12 = hour % 12 || 12;
+      return `${hour12}:${minutes} ${ampm}`;
+    }
+  }
+  return time24;
+};
 
-const recentAppointments = [
-  {
-    id: 1,
-    patient: "Abebe Kebede",
-    service: "Root Canal Treatment",
-    time: "09:00 AM",
-    status: "confirmed",
-    avatar: "https://i.pravatar.cc/100?img=1",
-  },
-  {
-    id: 2,
-    patient: "Tigist Alemu",
-    service: "Teeth Cleaning",
-    time: "10:30 AM",
-    status: "in-progress",
-    avatar: "https://i.pravatar.cc/100?img=2",
-  },
-  {
-    id: 3,
-    patient: "Dawit Tadesse",
-    service: "Orthodontics",
-    time: "02:00 PM",
-    status: "confirmed",
-    avatar: "https://i.pravatar.cc/100?img=3",
-  },
-  {
-    id: 4,
-    patient: "Meron Hailu",
-    service: "Cosmetic Dentistry",
-    time: "03:30 PM",
-    status: "pending",
-    avatar: "https://i.pravatar.cc/100?img=4",
-  },
-];
+// Helper function to format date
+const formatDate = (dateString: string) => {
+  if (!dateString) return "";
+  const date = new Date(dateString);
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+};
 
-const upcomingAppointments = [
-  {
-    patient: "Sara Ahmed",
-    service: "Checkup",
-    date: "Tomorrow",
-    time: "10:00 AM",
-  },
-  {
-    patient: "John Doe",
-    service: "Crown Placement",
-    date: "Dec 18",
-    time: "02:00 PM",
-  },
-  {
-    patient: "Hanna Solomon",
-    service: "Root Canal",
-    date: "Dec 19",
-    time: "11:00 AM",
-  },
-];
+// Helper function to get relative date (Today, Tomorrow, etc.)
+const getRelativeDate = (dateString: string) => {
+  if (!dateString) return "";
+  const date = new Date(dateString);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const targetDate = new Date(date);
+  targetDate.setHours(0, 0, 0, 0);
+
+  const diffTime = targetDate.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Tomorrow";
+  if (diffDays === -1) return "Yesterday";
+  return formatDate(dateString);
+};
 
 
 const statusColors: Record<string, string> = {
+  SCHEDULED: "yellow",
+  CONFIRMED: "green",
+  COMPLETED: "gray",
+  CANCELLED: "red",
+  NO_SHOW: "orange",
   confirmed: "green",
   pending: "yellow",
   "in-progress": "blue",
   completed: "gray",
 };
 
-export default function DashboardPage() {
-  const { data: unreadMessages } = useGetUnreadMessagesQuery();
-  const unreadCount = unreadMessages?.count || 0;
+// Icon mapping for stats
+const statIcons: Record<string, any> = {
+  "New Patients": TrendingUp,
+  "Completed": Calendar,
+  "Unread Messages": MessageSquare,
+  "Total Patients": Users,
+};
 
-  // Update stats data with real unread messages count
-  const updatedStatsData = statsData.map((stat) => {
-    if (stat.title === "Unread Messages") {
-      return {
-        ...stat,
-        value: unreadCount.toString(),
-      };
-    }
-    return stat;
-  });
+// Color mapping for stats
+const statColors: Record<string, string> = {
+  "New Patients": "bg-blue-500",
+  "Completed": "bg-green-500",
+  "Unread Messages": "bg-purple-500",
+  "Total Patients": "bg-yellow-500",
+};
+
+export default function DashboardPage() {
+  const router = useRouter();
+  const { data: dashboardData, isLoading, error } = useGetDashboardQuery();
+
+  if (isLoading) {
+    return (
+      <Box>
+        <div className="flex justify-center items-center py-12">
+          <Loader size="lg" color="teal" />
+        </div>
+      </Box>
+    );
+  }
+
+  if (error || !dashboardData) {
+    return (
+      <Box>
+        <Text c="red" ta="center" py="xl">
+          Error loading dashboard data. Please try again later.
+        </Text>
+      </Box>
+    );
+  }
+
+  const { stats, today_appointments, upcoming_appointments, recent_messages, recent_feedbacks } = dashboardData;
+
+  // Build stats array from API data
+  const statsArray = [
+    stats.new_patients,
+    stats.completed_appointments,
+    stats.unread_messages,
+    stats.total_patients,
+  ];
 
   return (
     <Box>
@@ -162,28 +154,33 @@ export default function DashboardPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        {updatedStatsData.map((stat, index) => (
-          <Card key={index} shadow="sm" p="lg" className="border border-gray-200 hover:shadow-md transition-shadow">
-            <Group justify="space-between" mb="md">
-              <div className={`${stat.color} p-3 rounded-lg`}>
-                <stat.icon size={24} className="text-white" />
-              </div>
-              {stat.trend === "up" ? (
-                <Group gap={4} className="text-green-600">
-                  <ArrowUpRight size={16} />
-                  <Text size="sm" fw={500}>{stat.change}</Text>
-                </Group>
-              ) : (
-                <Group gap={4} className="text-red-600">
-                  <ArrowDownRight size={16} />
-                  <Text size="sm" fw={500}>{stat.change}</Text>
-                </Group>
-              )}
-            </Group>
-            <Text size="sm" c="dimmed" mb={4}>{stat.title}</Text>
-            <Text size="xl" fw={700}>{stat.value}</Text>
-          </Card>
-        ))}
+        {statsArray.map((stat, index) => {
+          const Icon = statIcons[stat.title] || Calendar;
+          const color = statColors[stat.title] || "bg-gray-500";
+
+          return (
+            <Card key={index} shadow="sm" p="lg" className="border border-gray-200 hover:shadow-md transition-shadow">
+              <Group justify="space-between" mb="md">
+                <div className={`${color} p-3 rounded-lg`}>
+                  <Icon size={24} className="text-white" />
+                </div>
+                {stat.trend === "up" ? (
+                  <Group gap={4} className="text-green-600">
+                    <ArrowUpRight size={16} />
+                    <Text size="sm" fw={500}>{stat.change}</Text>
+                  </Group>
+                ) : (
+                  <Group gap={4} className="text-red-600">
+                    <ArrowDownRight size={16} />
+                    <Text size="sm" fw={500}>{stat.change}</Text>
+                  </Group>
+                )}
+              </Group>
+              <Text size="sm" c="dimmed" mb={4}>{stat.title}</Text>
+              <Text size="xl" fw={700}>{stat.value}</Text>
+            </Card>
+          );
+        })}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
@@ -192,44 +189,69 @@ export default function DashboardPage() {
           <Group justify="space-between" mb="lg">
             <div>
               <Title order={4}>Today's Appointments</Title>
-              <Text size="sm" c="dimmed">Monday, December 16, 2024</Text>
+              <Text size="sm" c="dimmed">{today_appointments.date}</Text>
             </div>
-            <Button variant="light" size="sm" leftSection={<Eye size={16} />}>
+            <Button
+              variant="light"
+              size="sm"
+              leftSection={<Eye size={16} />}
+              onClick={() => router.push("/appointments")}
+            >
               View All
             </Button>
           </Group>
 
           <Stack gap="md">
-            {recentAppointments.map((appointment) => (
-              <Card key={appointment.id} className="bg-gray-50 border border-gray-200 hover:border-[#19b5af] transition-colors">
-                <Group justify="space-between">
-                  <Group>
-                    <Avatar src={appointment.avatar} size={50} radius="xl" />
-                    <div>
-                      <Text size="sm" fw={600}>{appointment.patient}</Text>
-                      <Text size="xs" c="dimmed">{appointment.service}</Text>
-                    </div>
-                  </Group>
-                  <Group>
-                    <Group gap={6}>
-                      <Clock size={16} className="text-gray-400" />
-                      <Text size="sm">{appointment.time}</Text>
+            {today_appointments.appointments.length === 0 ? (
+              <Text size="sm" c="dimmed" ta="center" py="md">No appointments for today</Text>
+            ) : (
+              today_appointments.appointments.map((appointment) => (
+                <Card key={appointment.id} className="bg-gray-50 border border-gray-200 hover:border-[#19b5af] transition-colors">
+                  <Group justify="space-between">
+                    <Group>
+                      <Avatar
+                        src={appointment.patient?.profile_picture || undefined}
+                        size={50}
+                        radius="xl"
+                      >
+                        {appointment.patient?.name?.charAt(0) || "?"}
+                      </Avatar>
+                      <div>
+                        <Text size="sm" fw={600}>
+                          {appointment.patient?.name || "Unknown Patient"}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          {appointment.service?.name || "No service"}
+                        </Text>
+                      </div>
                     </Group>
-                    <Badge
-                      variant="light"
-                      color={statusColors[appointment.status]}
-                      size="sm"
-                      className="capitalize"
-                    >
-                      {appointment.status.replace('-', ' ')}
-                    </Badge>
-                    <ActionIcon variant="light" color="gray">
-                      <MoreVertical size={16} />
-                    </ActionIcon>
+                    <Group>
+                      <Group gap={6}>
+                        <Clock size={16} className="text-gray-400" />
+                        <Text size="sm">
+                          {appointment.formatted_start_time
+                            ? convertTo12Hour(appointment.formatted_start_time)
+                            : appointment.start_time
+                            ? convertTo12Hour(appointment.start_time)
+                            : "N/A"}
+                        </Text>
+                      </Group>
+                      <Badge
+                        variant="light"
+                        color={statusColors[appointment.status] || "gray"}
+                        size="sm"
+                        className="capitalize"
+                      >
+                        {appointment.status.replace('_', ' ')}
+                      </Badge>
+                      <ActionIcon variant="light" color="gray">
+                        <MoreVertical size={16} />
+                      </ActionIcon>
+                    </Group>
                   </Group>
-                </Group>
-              </Card>
-            ))}
+                </Card>
+              ))
+            )}
           </Stack>
         </Card>
 
@@ -243,44 +265,68 @@ export default function DashboardPage() {
           </Group>
 
           <Stack gap="md">
-            {upcomingAppointments.map((appointment, index) => (
-              <div key={index} className="pb-4 border-b border-gray-200 last:border-0 last:pb-0">
-                <Group justify="space-between" mb={4}>
-                  <Text size="sm" fw={600}>{appointment.patient}</Text>
-                  <Badge variant="light" size="xs">{appointment.date}</Badge>
-                </Group>
-                <Text size="xs" c="dimmed" mb={4}>{appointment.service}</Text>
-                <Group gap={6}>
-                  <Clock size={14} className="text-gray-400" />
-                  <Text size="xs" c="dimmed">{appointment.time}</Text>
-                </Group>
-              </div>
-            ))}
+            {upcoming_appointments.appointments.length === 0 ? (
+              <Text size="sm" c="dimmed" ta="center" py="md">No upcoming appointments</Text>
+            ) : (
+              upcoming_appointments.appointments.map((appointment, index) => (
+                <div key={appointment.id || index} className="pb-4 border-b border-gray-200 last:border-0 last:pb-0">
+                  <Group justify="space-between" mb={4}>
+                    <Text size="sm" fw={600}>
+                      {appointment.patient?.name || "Unknown Patient"}
+                    </Text>
+                    <Badge variant="light" size="xs">
+                      {appointment.formatted_date
+                        ? getRelativeDate(appointment.formatted_date)
+                        : appointment.scheduled_date
+                        ? getRelativeDate(appointment.scheduled_date)
+                        : "N/A"}
+                    </Badge>
+                  </Group>
+                  <Text size="xs" c="dimmed" mb={4}>
+                    {appointment.service?.name || "No service"}
+                  </Text>
+                  <Group gap={6}>
+                    <Clock size={14} className="text-gray-400" />
+                    <Text size="xs" c="dimmed">
+                      {appointment.formatted_start_time
+                        ? convertTo12Hour(appointment.formatted_start_time)
+                        : appointment.start_time
+                        ? convertTo12Hour(appointment.start_time)
+                        : "N/A"}
+                    </Text>
+                  </Group>
+                </div>
+              ))
+            )}
           </Stack>
 
-          <Button variant="light" fullWidth mt="md" className="hover:bg-[#19b5af]/10">
+          <Button
+            variant="light"
+            fullWidth
+            mt="md"
+            className="hover:bg-[#19b5af]/10"
+            onClick={() => router.push("/appointments")}
+          >
             View All Appointments
           </Button>
         </Card>
       </div>
 
       {/* Messages */}
-      <MessagesSection />
+      <MessagesSection dashboardMessages={recent_messages} />
 
       {/* Feedbacks Section */}
-      <FeedbacksSection />
+      <FeedbacksSection dashboardFeedbacks={recent_feedbacks} />
     </Box>
   );
 }
 
 // Messages Section Component
-function MessagesSection() {
+function MessagesSection({ dashboardMessages }: { dashboardMessages?: any }) {
   const router = useRouter();
-  const { data: unreadMessages, isLoading: isLoadingMessages } = useGetUnreadMessagesQuery({ page_size: 5 });
-  const { data: recentMessages } = useGetMessagesQuery({ page_size: 5 });
 
-  const unreadCount = unreadMessages?.count || 0;
-  const messages = recentMessages?.results || [];
+  const unreadCount = dashboardMessages?.unread_count || 0;
+  const messages = dashboardMessages?.messages || [];
 
   return (
     <Card shadow="sm" p="lg" className="border border-gray-200">
@@ -303,9 +349,7 @@ function MessagesSection() {
         </Button>
       </Group>
 
-      {isLoadingMessages ? (
-        <Text size="sm" c="dimmed" ta="center" py="md">Loading messages...</Text>
-      ) : messages.length === 0 ? (
+      {messages.length === 0 ? (
         <Text size="sm" c="dimmed" ta="center" py="md">No messages</Text>
       ) : (
         <Stack gap="sm">
@@ -353,44 +397,10 @@ function MessagesSection() {
 }
 
 // Feedbacks Section Component
-function FeedbacksSection() {
-  // Mock feedbacks data - replace with real API when available
-  const mockFeedbacks = [
-    {
-      id: 1,
-      patient: "Abebe Kebede",
-      rating: 5,
-      comment: "Excellent service! The staff was very professional and the treatment was painless.",
-      date: "2024-12-15",
-      service: "Root Canal Treatment",
-    },
-    {
-      id: 2,
-      patient: "Tigist Alemu",
-      rating: 4,
-      comment: "Good experience overall. Clean facility and friendly staff.",
-      date: "2024-12-14",
-      service: "Teeth Cleaning",
-    },
-    {
-      id: 3,
-      patient: "Dawit Tadesse",
-      rating: 5,
-      comment: "Best dental clinic in town! Highly recommend.",
-      date: "2024-12-13",
-      service: "Orthodontics",
-    },
-    {
-      id: 4,
-      patient: "Meron Hailu",
-      rating: 4,
-      comment: "Very satisfied with the treatment. Will come back for follow-up.",
-      date: "2024-12-12",
-      service: "Cosmetic Dentistry",
-    },
-  ];
-
-  const averageRating = mockFeedbacks.reduce((sum, f) => sum + f.rating, 0) / mockFeedbacks.length;
+function FeedbacksSection({ dashboardFeedbacks }: { dashboardFeedbacks?: any }) {
+  const feedbacks = dashboardFeedbacks?.feedbacks || [];
+  const averageRating = dashboardFeedbacks?.average_rating || 0;
+  const feedbackCount = dashboardFeedbacks?.count || 0;
 
   return (
     <Card shadow="sm" p="lg" className="border border-gray-200">
@@ -402,51 +412,51 @@ function FeedbacksSection() {
         <Group gap="xs">
           <Star size={20} className="text-yellow-500 fill-yellow-500" />
           <Text size="lg" fw={700}>
-            {averageRating.toFixed(1)}
+            {averageRating > 0 ? averageRating.toFixed(1) : "0.0"}
           </Text>
           <Text size="sm" c="dimmed">
-            ({mockFeedbacks.length} reviews)
+            ({feedbackCount} reviews)
           </Text>
         </Group>
       </Group>
 
       <Stack gap="md">
-        {mockFeedbacks.map((feedback) => (
-          <Card key={feedback.id} className="bg-gray-50 border border-gray-200">
-            <Group justify="space-between" align="flex-start" mb="xs">
-              <div className="flex-1">
-                <Group gap="xs" mb={4}>
-                  <Text size="sm" fw={600}>
-                    {feedback.patient}
-                  </Text>
-                  <Group gap={4}>
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        size={14}
-                        className={
-                          i < feedback.rating
-                            ? "text-yellow-500 fill-yellow-500"
-                            : "text-gray-300"
-                        }
-                      />
-                    ))}
+        {feedbacks.length === 0 ? (
+          <Text size="sm" c="dimmed" ta="center" py="md">No feedbacks yet</Text>
+        ) : (
+          feedbacks.map((feedback: any) => (
+            <Card key={feedback.id} className="bg-gray-50 border border-gray-200">
+              <Group justify="space-between" align="flex-start" mb="xs">
+                <div className="flex-1">
+                  <Group gap="xs" mb={4}>
+                    <Text size="sm" fw={600}>
+                      {feedback.patient?.name || "Anonymous"}
+                    </Text>
+                    <Group gap={4}>
+                      {[...Array(5)].map((_, i) => (
+                        <Star
+                          key={i}
+                          size={14}
+                          className={
+                            i < feedback.rating
+                              ? "text-yellow-500 fill-yellow-500"
+                              : "text-gray-300"
+                          }
+                        />
+                      ))}
+                    </Group>
                   </Group>
-                </Group>
-                <Text size="xs" c="dimmed" mb={4}>
-                  {feedback.service} • {new Date(feedback.date).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                </Text>
-                <Text size="sm" lineClamp={2}>
-                  {feedback.comment}
-                </Text>
-              </div>
-            </Group>
-          </Card>
-        ))}
+                  <Text size="xs" c="dimmed" mb={4}>
+                    {feedback.service?.name || "No service"} • {formatDate(feedback.created_at)}
+                  </Text>
+                  <Text size="sm" lineClamp={2}>
+                    {feedback.comment || "No comment"}
+                  </Text>
+                </div>
+              </Group>
+            </Card>
+          ))
+        )}
       </Stack>
 
       <Button variant="light" fullWidth mt="md" className="hover:bg-[#19b5af]/10">
