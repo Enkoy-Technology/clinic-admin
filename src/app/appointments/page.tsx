@@ -40,6 +40,7 @@ import {
   useGetActiveAppointmentsQuery,
   useUpdateAppointmentMutation,
 } from "../../shared/api/appointmentsApi";
+import { useGetPatientsQuery } from "../../shared/api/patientsApi";
 
 // Time slots in 24-hour format for backend
 const timeSlots24 = [
@@ -105,13 +106,7 @@ const convertTo24Hour = (time12: string) => {
 // Time slots in 12-hour format for display
 const timeSlots = timeSlots24.map(convertTo12Hour);
 
-// Mock data
-const existingPatients = [
-  { value: "1", label: "Abebe Kebede", phone: "+251 911 234 567" },
-  { value: "2", label: "Tigist Alemu", phone: "+251 912 345 678" },
-  { value: "3", label: "Dawit Tadesse", phone: "+251 913 456 789" },
-  { value: "4", label: "Sara Getachew", phone: "+251 914 567 890" },
-];
+// Removed mock patients - will use real data from API
 
 const mockReminders = [
   { id: 1, patient: "Abebe Kebede", phone: "+251 911 234 567", date: "Today", time: "02:00 PM", reminderSent: false },
@@ -181,10 +176,23 @@ export default function AppointmentsPage() {
   }, [selectedDate, currentMonth, activeTab]);
 
   // Fetch appointments from API
-  const { data: appointmentsData, isLoading, refetch } = useGetActiveAppointmentsQuery(dateRange);
+  const { data: appointmentsData, isLoading, refetch } = useGetActiveAppointmentsQuery(dateRange, {
+    refetchOnMountOrArgChange: true, // Force refetch when navigating to this page
+  });
   const [createAppointment] = useCreateAppointmentMutation();
   const [updateAppointment] = useUpdateAppointmentMutation();
   const [deleteAppointment] = useDeleteAppointmentMutation();
+
+  // Fetch patients for follow-up appointments dropdown
+  const { data: patientsData } = useGetPatientsQuery(
+    {
+      page: 1,
+      per_page: 1000, // Get all patients for dropdown
+    },
+    {
+      refetchOnMountOrArgChange: true, // Force refetch when navigating to this page
+    }
+  );
 
   // Convert API appointments to time slot format
   const appointments = useMemo(() => {
@@ -193,23 +201,48 @@ export default function AppointmentsPage() {
     }
 
     const slots: Record<string, any> = {};
+    const selectedDateStr = formatDateForAPI(selectedDate);
+
     appointmentsData.appointments.forEach((apt) => {
+      // Only process appointments for the selected date (for daily view)
+      const aptDate = apt.formatted_date;
+      if (aptDate !== selectedDateStr) {
+        return; // Skip appointments not for the selected date
+      }
+
       // Use formatted_start_time in 24-hour format, convert to 12-hour for display
-      const timeKey24 = apt.formatted_start_time; // e.g., "14:30"
-      const timeKey12 = convertTo12Hour(timeKey24); // e.g., "2:30 PM"
+      const timeKey24 = apt.formatted_start_time; // e.g., "10:00"
+      const timeKey12 = convertTo12Hour(timeKey24); // e.g., "10:00 AM"
+
+      // Calculate duration from start_time and end_time
+      const startParts = timeKey24.split(":").map(Number);
+      const endParts = apt.formatted_end_time.split(":").map(Number);
+      const startHours = startParts[0] || 0;
+      const startMins = startParts[1] || 0;
+      const endHours = endParts[0] || 0;
+      const endMins = endParts[1] || 0;
+      const startMinutes = startHours * 60 + startMins;
+      const endMinutes = endHours * 60 + endMins;
+      const duration = endMinutes - startMinutes;
+
+      // Find patient phone number from patients data if available
+      const patientId = apt.patient?.id || apt.patient?.patient_id;
+      const patientFromList = patientsData?.results?.find((p: any) => p.id === patientId);
+      const phone = patientFromList?.profile?.phone_number || "N/A";
 
       slots[timeKey12] = {
         ...apt,
         time24: timeKey24, // Keep 24-hour format for API calls
-        patient: apt.doctor?.name || apt.service?.name || "Unnamed Patient",
-        phone: apt.doctor?.phone || "N/A",
+        patient: apt.patient?.name || "Unnamed Patient",
+        patientId: patientId,
+        phone: phone,
         type: apt.status === "SCHEDULED" ? "new" : "followup",
-        duration: 30, // Calculate from start_time and end_time if needed
+        duration: duration || 30,
       };
     });
 
     return slots;
-  }, [appointmentsData]);
+  }, [appointmentsData, selectedDate, patientsData]);
 
   // Group appointments by date for weekly/monthly views
   const appointmentsByDate = useMemo(() => {
@@ -257,6 +290,10 @@ export default function AppointmentsPage() {
     return compareDate < today;
   };
 
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+  const [newPatientName, setNewPatientName] = useState("");
+  const [newPatientPhone, setNewPatientPhone] = useState("");
+
   const handleQuickSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -274,19 +311,32 @@ export default function AppointmentsPage() {
         const scheduledDate = formatDateForAPI(selectedDate);
         if (!scheduledDate) return;
 
-        await createAppointment({
+        // Prepare appointment payload
+        const appointmentPayload: any = {
           scheduled_date: scheduledDate,
           start_time: time24 + ":00",
           end_time: `${endDate.getHours().toString().padStart(2, "0")}:${endDate.getMinutes().toString().padStart(2, "0")}:00`,
           status: "SCHEDULED",
-        }).unwrap();
+        };
+
+        // Add patient ID if it's a follow-up appointment
+        if (bookingTab === "followup" && selectedPatientId) {
+          appointmentPayload.patient = parseInt(selectedPatientId);
+        }
+        // For new patients, the backend might create the patient automatically
+        // or we might need to create the patient first - adjust based on your API
+
+        await createAppointment(appointmentPayload).unwrap();
 
         refetch();
         closeBook();
         setAppointmentType(null);
         setSelectedSlot(null);
+        setSelectedPatientId(null);
+        setNewPatientName("");
+        setNewPatientPhone("");
       } catch (error) {
-        // Silently handle error
+        console.error("Failed to create appointment:", error);
       }
     }
   };
@@ -304,13 +354,14 @@ export default function AppointmentsPage() {
         await updateAppointment({
           id: editingAppointment.id,
           data: {
-            // Update with actual fields from your API
-            status: editingAppointment.status,
+            status: editingAppointment.status || "SCHEDULED",
+            // Add other fields that can be updated if needed
           },
         }).unwrap();
 
         refetch();
         closeEdit();
+        setEditingAppointment(null);
       } catch (error) {
         console.error("Failed to update appointment:", error);
       }
@@ -697,7 +748,7 @@ export default function AppointmentsPage() {
                               </Text>
                             </Group>
                             <Text size="sm" fw={600}>
-                              {apt.doctor?.name || apt.service?.name || "Appointment"}
+                              {apt.patient?.name || "Appointment"}
                             </Text>
                           </div>
                         ))
@@ -966,19 +1017,42 @@ export default function AppointmentsPage() {
             <Stack gap="md">
               {bookingTab === "new" && (
                 <>
-                  <TextInput name="patient" label="Patient Name" placeholder="Full name" required size="lg" autoFocus />
-                  <TextInput name="phone" label="Phone Number" placeholder="+251 911 234 567" required size="lg" />
+                  <TextInput
+                    label="Patient Name"
+                    placeholder="Full name"
+                    required
+                    size="lg"
+                    autoFocus
+                    value={newPatientName}
+                    onChange={(e) => setNewPatientName(e.currentTarget.value)}
+                  />
+                  <TextInput
+                    label="Phone Number"
+                    placeholder="+251 911 234 567"
+                    required
+                    size="lg"
+                    value={newPatientPhone}
+                    onChange={(e) => setNewPatientPhone(e.currentTarget.value)}
+                  />
                 </>
               )}
 
               {bookingTab === "followup" && (
                   <Select
-                    name="selectedPatient"
                     label="Select Patient"
                     placeholder="Choose existing patient"
                     required
                     size="lg"
-                  data={existingPatients.map((p) => ({ value: p.value, label: `${p.label} - ${p.phone}` }))}
+                    data={(patientsData?.results || []).map((p: any) => {
+                      const fullName = `${p.profile?.user?.first_name || ""} ${p.profile?.user?.last_name || ""}`.trim() || p.name || "N/A";
+                      const phone = p.profile?.phone_number || "N/A";
+                      return {
+                        value: p.id.toString(),
+                        label: `${fullName} - ${phone}`,
+                      };
+                    })}
+                    value={selectedPatientId}
+                    onChange={setSelectedPatientId}
                     searchable
                     autoFocus
                   />
@@ -1039,8 +1113,35 @@ export default function AppointmentsPage() {
       >
         <form onSubmit={handleUpdateAppointment}>
           <Stack gap="md">
-            <TextInput name="patient" label="Patient Name" defaultValue={editingAppointment?.patient} required size="lg" />
-            <TextInput name="phone" label="Phone Number" defaultValue={editingAppointment?.phone} required size="lg" />
+            <TextInput
+              name="patient"
+              label="Patient Name"
+              value={editingAppointment?.patient || ""}
+              onChange={(e) => setEditingAppointment({ ...editingAppointment, patient: e.currentTarget.value })}
+              required
+              size="lg"
+            />
+            <TextInput
+              name="phone"
+              label="Phone Number"
+              value={editingAppointment?.phone || ""}
+              onChange={(e) => setEditingAppointment({ ...editingAppointment, phone: e.currentTarget.value })}
+              required
+              size="lg"
+            />
+            <Select
+              label="Status"
+              value={editingAppointment?.status || "SCHEDULED"}
+              onChange={(value) => setEditingAppointment({ ...editingAppointment, status: value as any })}
+              data={[
+                { value: "SCHEDULED", label: "Scheduled" },
+                { value: "CONFIRMED", label: "Confirmed" },
+                { value: "COMPLETED", label: "Completed" },
+                { value: "CANCELLED", label: "Cancelled" },
+                { value: "NO_SHOW", label: "No Show" },
+              ]}
+              size="lg"
+            />
             <Group justify="flex-end" mt="md">
               <Button variant="light" onClick={closeEdit} size="lg">
                 Cancel

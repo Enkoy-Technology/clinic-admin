@@ -1,6 +1,5 @@
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
-
-const API_BASE_URL = "/api";
+import { createApi } from "@reduxjs/toolkit/query/react";
+import { baseQueryWithReauth } from "./authApi";
 
 export interface Appointment {
   id: number;
@@ -15,6 +14,12 @@ export interface Appointment {
   branch: any | null;
   doctor: any | null;
   service: any | null;
+  patient: {
+    id: number;
+    name: string;
+    patient_id: number;
+    profile_picture: string | null;
+  } | null;
 }
 
 export interface AppointmentsResponse {
@@ -33,17 +38,7 @@ export interface GetAppointmentsParams {
 
 export const appointmentsApi = createApi({
   reducerPath: "appointmentsApi",
-  baseQuery: fetchBaseQuery({
-    baseUrl: API_BASE_URL,
-    prepareHeaders: (headers) => {
-      const token = localStorage.getItem("accessToken");
-      if (token) {
-        headers.set("authorization", `Bearer ${token}`);
-      }
-      headers.set("Content-Type", "application/json");
-      return headers;
-    },
-  }),
+  baseQuery: baseQueryWithReauth,
   tagTypes: ["Appointments"],
   endpoints: (builder) => ({
     getActiveAppointments: builder.query<AppointmentsResponse, GetAppointmentsParams>({
