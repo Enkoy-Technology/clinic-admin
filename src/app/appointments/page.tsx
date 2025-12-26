@@ -185,9 +185,9 @@ export default function AppointmentsPage() {
   const { data: appointmentsData, isLoading, refetch } = useGetActiveAppointmentsQuery(dateRange, {
     refetchOnMountOrArgChange: true, // Force refetch when navigating to this page
   });
-  const [createAppointment] = useCreateAppointmentMutation();
-  const [updateAppointment] = useUpdateAppointmentMutation();
-  const [deleteAppointment] = useDeleteAppointmentMutation();
+  const [createAppointment, { isLoading: isCreatingAppointment }] = useCreateAppointmentMutation();
+  const [updateAppointment, { isLoading: isUpdatingAppointment }] = useUpdateAppointmentMutation();
+  const [deleteAppointment, { isLoading: isDeletingAppointment }] = useDeleteAppointmentMutation();
 
   // Fetch patients for follow-up appointments dropdown
   const { data: patientsData } = useGetPatientsQuery(
@@ -326,6 +326,7 @@ export default function AppointmentsPage() {
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [newPatientName, setNewPatientName] = useState("");
   const [newPatientPhone, setNewPatientPhone] = useState("");
+  const [deletingAppointmentId, setDeletingAppointmentId] = useState<number | null>(null);
 
   const handleQuickSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -509,6 +510,7 @@ export default function AppointmentsPage() {
         return;
       }
 
+      setDeletingAppointmentId(appointment.id);
       try {
         await deleteAppointment(appointment.id).unwrap();
         notifications.show({
@@ -523,6 +525,8 @@ export default function AppointmentsPage() {
           message: error?.data?.detail || error?.data?.message || "Failed to delete appointment",
           color: "red",
         });
+      } finally {
+        setDeletingAppointmentId(null);
       }
     }
   };
@@ -788,6 +792,7 @@ export default function AppointmentsPage() {
                               color="blue"
                               onClick={() => handleEditAppointment(time, appointment)}
                               title="Edit"
+                              disabled={isUpdatingAppointment || isDeletingAppointment}
                             >
                               <Edit size={14} />
                             </ActionIcon>
@@ -797,6 +802,8 @@ export default function AppointmentsPage() {
                               color="red"
                               onClick={() => handleDeleteAppointment(time)}
                               title="Delete"
+                              loading={deletingAppointmentId === appointment.id}
+                              disabled={deletingAppointmentId === appointment.id || isDeletingAppointment}
                             >
                               <Trash2 size={14} />
                             </ActionIcon>
@@ -1230,7 +1237,12 @@ export default function AppointmentsPage() {
               />
 
               <Group justify="flex-end" mt="md">
-                <Button variant="light" onClick={closeBook} size="lg">
+                <Button
+                  variant="light"
+                  onClick={closeBook}
+                  size="lg"
+                  disabled={isCreatingAppointment}
+                >
                   Cancel
                 </Button>
                 <Button
@@ -1238,7 +1250,8 @@ export default function AppointmentsPage() {
                   size="lg"
                   className="bg-[#19b5af] hover:bg-[#14918c]"
                   leftSection={<Check size={18} />}
-                  disabled={!selectedSlot}
+                  disabled={!selectedSlot || isCreatingAppointment}
+                  loading={isCreatingAppointment}
                 >
                   Book Appointment
                 </Button>
@@ -1258,7 +1271,7 @@ export default function AppointmentsPage() {
         }}
         title={
           <Group>
-            <Edit size={20} className="text-blue-600" />
+            <Edit size={20} className="text-[#19b5af]" />
             <Text fw={600} size="lg">
               Edit Appointment
             </Text>
@@ -1376,14 +1389,17 @@ export default function AppointmentsPage() {
                   editForm.reset();
                 }}
                 size="lg"
+                disabled={isUpdatingAppointment}
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
                 size="lg"
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-[#19b5af] hover:bg-[#14918c]"
                 leftSection={<Check size={18} />}
+                loading={isUpdatingAppointment}
+                disabled={isUpdatingAppointment}
               >
                 Update Appointment
               </Button>
