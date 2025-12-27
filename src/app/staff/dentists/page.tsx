@@ -1,46 +1,46 @@
 "use client";
 
 import {
-    ActionIcon,
-    Avatar,
-    Badge,
-    Box,
-    Button,
-    Card,
-    Group,
+  ActionIcon,
+  Avatar,
+  Badge,
+  Box,
+  Button,
+  Card,
+  Group,
   Loader,
-    Menu,
-    Modal,
+  Menu,
+  Modal,
   NumberInput,
-    Select,
-    Stack,
+  Select,
+  Stack,
   Switch,
-    Table,
-    Tabs,
-    Text,
+  Table,
+  Tabs,
+  Text,
   Textarea,
-    TextInput,
-    Title
+  TextInput,
+  Title
 } from "@mantine/core";
 import { DatePickerInput } from "@mantine/dates";
 import { useForm } from "@mantine/form";
 import { useDisclosure } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import {
-    Award,
-    Calendar,
-    Edit,
-    Eye,
-    Mail,
-    MoreVertical,
-    Phone,
-    Plus,
-    Search,
-    Trash2,
+  Award,
+  Calendar,
+  Edit,
+  Eye,
+  Mail,
+  MoreVertical,
+  Phone,
+  Plus,
+  Search,
+  Trash2,
   User
 } from "lucide-react";
 import { useState } from "react";
-import { useCreateDoctorMutation, useGetDoctorsQuery, useUpdateDoctorMutation, type CreateDoctorRequest } from "../../../shared/api/doctorsApi";
+import { useCreateDoctorMutation, useDeleteDoctorMutation, useGetDoctorsQuery, useUpdateDoctorMutation, type CreateDoctorRequest } from "../../../shared/api/doctorsApi";
 
 
 export default function DentistsPage() {
@@ -54,6 +54,7 @@ export default function DentistsPage() {
 
   const [createDoctor, { isLoading: isCreating }] = useCreateDoctorMutation();
   const [updateDoctor, { isLoading: isUpdating }] = useUpdateDoctorMutation();
+  const [deleteDoctor, { isLoading: isDeleting }] = useDeleteDoctorMutation();
   const { data: doctorsData, isLoading: isLoadingDoctors, refetch } = useGetDoctorsQuery({
     page: currentPage,
     per_page: perPage,
@@ -133,6 +134,28 @@ export default function DentistsPage() {
       });
     }
     open();
+  };
+
+  const handleDeleteDentist = async (dentist: any) => {
+    if (!window.confirm(`Are you sure you want to delete ${dentist.profile?.user?.first_name || ""} ${dentist.profile?.user?.last_name || ""}? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await deleteDoctor(dentist.id).unwrap();
+      notifications.show({
+        title: "Success",
+        message: "Dentist deleted successfully",
+        color: "green",
+      });
+      refetch();
+    } catch (error: any) {
+      notifications.show({
+        title: "Error",
+        message: error?.data?.detail || error?.data?.message || "Failed to delete dentist",
+        color: "red",
+      });
+    }
   };
 
   const handleSubmit = async (values: typeof form.values) => {
@@ -377,7 +400,12 @@ export default function DentistsPage() {
                           </ActionIcon>
                         </Menu.Target>
                         <Menu.Dropdown>
-                          <Menu.Item leftSection={<Trash2 size={16} />} color="red">
+                          <Menu.Item
+                            leftSection={<Trash2 size={16} />}
+                            color="red"
+                            onClick={() => handleDeleteDentist(dentist)}
+                            disabled={isDeleting}
+                          >
                             Remove
                           </Menu.Item>
                         </Menu.Dropdown>
