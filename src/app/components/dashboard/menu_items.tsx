@@ -3,6 +3,7 @@ import {
   IconCalendar,
   IconDashboard,
   IconReportMedical,
+  IconStar,
   IconStethoscope,
   IconUsers
 } from "@tabler/icons-react";
@@ -39,6 +40,12 @@ const menuItems = [
     icon: IconReportMedical,
     label: "Services",
     link: "/services",
+    category: "Clinical",
+  },
+  {
+    icon: IconStar,
+    label: "Feedbacks",
+    link: "/feedbacks",
     category: "Clinical",
   },
 
