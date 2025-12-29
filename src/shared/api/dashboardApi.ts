@@ -22,11 +22,11 @@ export interface Appointment {
     name: string;
     patient_id?: number;
     profile_picture?: string | null;
-  } | null;
+  } | string | null; // Can be object or string
   service?: {
     id: number;
     name: string;
-  } | null;
+  } | string | null; // Can be object or string
   doctor?: {
     id: number;
     name: string;
@@ -38,16 +38,45 @@ export interface Appointment {
   status: string;
   scheduled_date?: string;
   formatted_date?: string;
+  // Fields from today_appointments response
+  time?: string;
+  avatar?: string | null;
+  patient_id?: number;
+  service_id?: number;
+  // Fields from upcoming_appointments response
+  date?: string;
+  appointment_id?: number;
+}
+
+export interface TodayAppointment {
+  id: number;
+  patient: string; // String in today_appointments
+  service: string; // String in today_appointments
+  time: string;
+  status: string;
+  avatar: string | null;
+  patient_id: number;
+  service_id: number;
 }
 
 export interface TodayAppointments {
   date: string;
-  appointments: Appointment[];
+  appointments: TodayAppointment[];
   count: number;
 }
 
+export interface UpcomingAppointment {
+  patient: string; // String in upcoming_appointments
+  service: string; // String in upcoming_appointments
+  date: string;
+  time: string;
+  appointment_id: number;
+  patient_id: number;
+  scheduled_date: string;
+}
+
 export interface UpcomingAppointments {
-  appointments: Appointment[];
+  appointments: UpcomingAppointment[];
   count: number;
 }
 

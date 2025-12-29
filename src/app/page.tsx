@@ -205,52 +205,55 @@ export default function DashboardPage() {
             {today_appointments.appointments.length === 0 ? (
               <Text size="sm" c="dimmed" ta="center" py="md">No appointments for today</Text>
             ) : (
-              today_appointments.appointments.map((appointment) => (
-                <Card key={appointment.id} className="bg-gray-50 border border-gray-200 hover:border-[#19b5af] transition-colors">
-                  <Group justify="space-between">
-                    <Group>
-                      <Avatar
-                        src={appointment.patient?.profile_picture || undefined}
-                        size={50}
-                        radius="xl"
-                      >
-                        {appointment.patient?.name?.charAt(0) || "?"}
-                      </Avatar>
-                      <div>
-                        <Text size="sm" fw={600}>
-                          {appointment.patient?.name || "Unknown Patient"}
-                        </Text>
-                        <Text size="xs" c="dimmed">
-                          {appointment.service?.name || "No service"}
-                        </Text>
-                      </div>
-                    </Group>
-                    <Group>
-                      <Group gap={6}>
-                        <Clock size={16} className="text-gray-400" />
-                        <Text size="sm">
-                          {appointment.formatted_start_time
-                            ? convertTo12Hour(appointment.formatted_start_time)
-                            : appointment.start_time
-                            ? convertTo12Hour(appointment.start_time)
-                            : "N/A"}
-                        </Text>
+              today_appointments.appointments.map((appointment) => {
+                // TodayAppointment has patient and service as strings
+                const patientName = appointment.patient || "Unknown Patient";
+                const serviceName = appointment.service || "No service";
+                const appointmentTime = appointment.time || "N/A";
+
+                return (
+                  <Card key={appointment.id} className="bg-gray-50 border border-gray-200 hover:border-[#19b5af] transition-colors">
+                    <Group justify="space-between">
+                      <Group>
+                        <Avatar
+                          src={appointment.avatar || undefined}
+                          size={50}
+                          radius="xl"
+                        >
+                          {patientName.charAt(0) || "?"}
+                        </Avatar>
+                        <div>
+                          <Text size="sm" fw={600}>
+                            {patientName}
+                          </Text>
+                          <Text size="xs" c="dimmed">
+                            {serviceName}
+                          </Text>
+                        </div>
                       </Group>
-                      <Badge
-                        variant="light"
-                        color={statusColors[appointment.status] || "gray"}
-                        size="sm"
-                        className="capitalize"
-                      >
-                        {appointment.status.replace('_', ' ')}
-                      </Badge>
-                      <ActionIcon variant="light" color="gray">
-                        <MoreVertical size={16} />
-                      </ActionIcon>
+                      <Group>
+                        <Group gap={6}>
+                          <Clock size={16} className="text-gray-400" />
+                          <Text size="sm">
+                            {appointmentTime !== "N/A" ? appointmentTime : "N/A"}
+                          </Text>
+                        </Group>
+                        <Badge
+                          variant="light"
+                          color={statusColors[appointment.status] || "gray"}
+                          size="sm"
+                          className="capitalize"
+                        >
+                          {appointment.status.replace('_', ' ')}
+                        </Badge>
+                        <ActionIcon variant="light" color="gray">
+                          <MoreVertical size={16} />
+                        </ActionIcon>
+                      </Group>
                     </Group>
-                  </Group>
-                </Card>
-              ))
+                  </Card>
+                );
+              })
             )}
           </Stack>
         </Card>
@@ -268,35 +271,35 @@ export default function DashboardPage() {
             {upcoming_appointments.appointments.length === 0 ? (
               <Text size="sm" c="dimmed" ta="center" py="md">No upcoming appointments</Text>
             ) : (
-              upcoming_appointments.appointments.map((appointment, index) => (
-                <div key={appointment.id || index} className="pb-4 border-b border-gray-200 last:border-0 last:pb-0">
-                  <Group justify="space-between" mb={4}>
-                    <Text size="sm" fw={600}>
-                      {appointment.patient?.name || "Unknown Patient"}
+              upcoming_appointments.appointments.map((appointment, index) => {
+                // UpcomingAppointment has patient and service as strings
+                const patientName = appointment.patient || "Unknown Patient";
+                const serviceName = appointment.service || "No service";
+                const appointmentDate = appointment.scheduled_date || "";
+                const appointmentTime = appointment.time || "N/A";
+
+                return (
+                  <div key={appointment.appointment_id || index} className="pb-4 border-b border-gray-200 last:border-0 last:pb-0">
+                    <Group justify="space-between" mb={4}>
+                      <Text size="sm" fw={600}>
+                        {patientName}
+                      </Text>
+                      <Badge variant="light" size="xs">
+                        {appointment.date || (appointmentDate ? getRelativeDate(appointmentDate) : "N/A")}
+                      </Badge>
+                    </Group>
+                    <Text size="xs" c="dimmed" mb={4}>
+                      {serviceName}
                     </Text>
-                    <Badge variant="light" size="xs">
-                      {appointment.formatted_date
-                        ? getRelativeDate(appointment.formatted_date)
-                        : appointment.scheduled_date
-                        ? getRelativeDate(appointment.scheduled_date)
-                        : "N/A"}
-                    </Badge>
-                  </Group>
-                  <Text size="xs" c="dimmed" mb={4}>
-                    {appointment.service?.name || "No service"}
-                  </Text>
-                  <Group gap={6}>
-                    <Clock size={14} className="text-gray-400" />
-                    <Text size="xs" c="dimmed">
-                      {appointment.formatted_start_time
-                        ? convertTo12Hour(appointment.formatted_start_time)
-                        : appointment.start_time
-                        ? convertTo12Hour(appointment.start_time)
-                        : "N/A"}
-                    </Text>
-                  </Group>
-                </div>
-              ))
+                    <Group gap={6}>
+                      <Clock size={14} className="text-gray-400" />
+                      <Text size="xs" c="dimmed">
+                        {appointmentTime !== "N/A" ? appointmentTime : "N/A"}
+                      </Text>
+                    </Group>
+                  </div>
+                );
+              })
             )}
           </Stack>
 

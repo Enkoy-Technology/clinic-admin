@@ -1,43 +1,43 @@
 "use client";
 
 import {
-  ActionIcon,
-  Avatar,
-  Badge,
-  Box,
-  Button,
-  Card,
-  Group,
-  Loader,
-  Menu,
-  Modal,
-  NumberInput,
-  Select,
-  Stack,
-  Switch,
-  Table,
-  Tabs,
-  Text,
-  Textarea,
-  TextInput,
-  Title
+    ActionIcon,
+    Avatar,
+    Badge,
+    Box,
+    Button,
+    Card,
+    Group,
+    Loader,
+    Menu,
+    Modal,
+    NumberInput,
+    Select,
+    Stack,
+    Switch,
+    Table,
+    Tabs,
+    Text,
+    Textarea,
+    TextInput,
+    Title
 } from "@mantine/core";
 import { DatePickerInput } from "@mantine/dates";
 import { useForm } from "@mantine/form";
 import { useDisclosure } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import {
-  Award,
-  Calendar,
-  Edit,
-  Eye,
-  Mail,
-  MoreVertical,
-  Phone,
-  Plus,
-  Search,
-  Trash2,
-  User
+    Award,
+    Calendar,
+    Edit,
+    Eye,
+    Mail,
+    MoreVertical,
+    Phone,
+    Plus,
+    Search,
+    Trash2,
+    User
 } from "lucide-react";
 import { useState } from "react";
 import { useCreateDoctorMutation, useDeleteDoctorMutation, useGetDoctorsQuery, useUpdateDoctorMutation, type CreateDoctorRequest } from "../../../shared/api/doctorsApi";

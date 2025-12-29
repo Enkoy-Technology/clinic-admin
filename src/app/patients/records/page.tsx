@@ -400,7 +400,7 @@ export default function PatientRecordsPage() {
                     `/patients/payments/add?patientId=${selectedPatient.id}&invoices=${invoicesParam}`
                   )
                 }
-              >
+          >
                 Add Payment
               </Button>
             );
@@ -458,8 +458,8 @@ export default function PatientRecordsPage() {
                 <stat.icon size={24} className="text-white" />
               </div>
             </Group>
-            </Card>
-          ))}
+          </Card>
+        ))}
       </div>
 
       {/* Filters */}

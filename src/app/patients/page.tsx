@@ -52,12 +52,12 @@ export default function PatientsPage() {
   const archivedPatients = patients.filter((p: any) => p.status?.toUpperCase() === "ARCHIVED").length;
 
   // Calculate age distribution (mock for now - would need age data from API)
-  const ageGroups = [
+const ageGroups = [
     { range: "0-18", count: 0, percentage: 0 },
     { range: "19-35", count: 0, percentage: 0 },
     { range: "36-50", count: 0, percentage: 0 },
     { range: "51+", count: 0, percentage: 0 },
-  ];
+];
 
   // Calculate gender distribution
   const maleCount = patients.filter((p: any) => p.gender === "MALE").length;
@@ -214,30 +214,30 @@ export default function PatientsPage() {
                   className="bg-gray-50 border border-gray-200 hover:border-[#19b5af] transition-colors cursor-pointer"
                   onClick={() => router.push(`/patients/list`)}
                 >
-                  <Group justify="space-between">
-                    <Group>
-                      <Avatar src={patient.avatar} size={50} radius="xl" />
-                      <div>
-                        <Text size="sm" fw={600}>{patient.name}</Text>
-                        <Group gap={6}>
-                          <Phone size={14} className="text-gray-400" />
-                          <Text size="xs" c="dimmed">{patient.phone}</Text>
-                        </Group>
+                <Group justify="space-between">
+                  <Group>
+                    <Avatar src={patient.avatar} size={50} radius="xl" />
+                    <div>
+                      <Text size="sm" fw={600}>{patient.name}</Text>
+                      <Group gap={6}>
+                        <Phone size={14} className="text-gray-400" />
+                        <Text size="xs" c="dimmed">{patient.phone}</Text>
+                      </Group>
                         <Text size="xs" c="dimmed" mt={2}>ID: #{patient.id}</Text>
-                      </div>
-                    </Group>
-                    <Group>
-                      <Badge
-                        variant="light"
-                        color={patient.status === "active" ? "green" : patient.status === "completed" ? "blue" : "gray"}
-                        size="sm"
-                        className="capitalize"
-                      >
-                        {patient.status}
-                      </Badge>
-                    </Group>
+                    </div>
                   </Group>
-                </Card>
+                  <Group>
+                    <Badge
+                      variant="light"
+                        color={patient.status === "active" ? "green" : patient.status === "completed" ? "blue" : "gray"}
+                      size="sm"
+                      className="capitalize"
+                    >
+                      {patient.status}
+                    </Badge>
+                  </Group>
+                </Group>
+              </Card>
               ))
             )}
           </Stack>

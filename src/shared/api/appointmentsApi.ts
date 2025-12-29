@@ -65,7 +65,7 @@ export const appointmentsApi = createApi({
           queryParams.patient = params.patient.toString();
         }
         return {
-          url: `/appointments/active`,
+        url: `/appointments/active`,
           params: queryParams,
         };
       },
