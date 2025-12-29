@@ -2,7 +2,9 @@ import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from "@reduxjs/toolk
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import { updateAccessToken } from "../slices/authSlice";
 
-const API_BASE_URL = "https://demo-oxua.onrender.com/api";
+// Use Next.js API proxy to avoid CORS issues
+// The proxy routes are at /api/auth/[...path]
+const API_BASE_URL = typeof window !== "undefined" ? "/api" : "https://demo-oxua.onrender.com/api";
 
 // Base query function that handles token refresh on 401 errors
 const baseQuery = fetchBaseQuery({
@@ -10,7 +12,8 @@ const baseQuery = fetchBaseQuery({
   prepareHeaders: (headers) => {
     const token = localStorage.getItem("accessToken");
     if (token) {
-      headers.set("Authorization", `JWT ${token}`);
+      // For Next.js API routes, use Bearer token format
+      headers.set("Authorization", `Bearer ${token}`);
     }
     headers.set("accept", "*/*");
     headers.set("Content-Type", "application/json");
@@ -57,7 +60,7 @@ export const baseQueryWithReauth: BaseQueryFn<
     if (refreshToken) {
       const refreshResult = await baseQuery(
         {
-          url: "/auth/refresh/",
+          url: "/auth/refresh",
           method: "POST",
           body: { refresh: refreshToken },
         },
@@ -171,7 +174,7 @@ export const authApi = createApi({
   endpoints: (builder) => ({
     login: builder.mutation<AuthResponse, LoginCredentials>({
       query: (credentials) => ({
-        url: "/auth/token/",
+        url: "/auth/token",
         method: "POST",
         body: credentials,
       }),
@@ -179,7 +182,7 @@ export const authApi = createApi({
     }),
     refreshToken: builder.mutation<{ token: string }, { refresh: string }>({
       query: (body) => ({
-        url: "/auth/refresh/",
+        url: "/auth/refresh",
         method: "POST",
         body,
       }),
